@@ -6,7 +6,7 @@ header('Content-Type: application/json');
 
 $host = getenv('MYSQLHOST');
 $port = getenv('MYSQLPORT') ?: 3306;
-$database = getenv('MYSQLDATABASE');
+$database = getenv('MYSQLDATABASE') ?: getenv('MYSQL_DATABASE');
 $username = getenv('MYSQLUSER');
 $password = getenv('MYSQLPASSWORD');
 
