@@ -1,3 +1,3 @@
 <?php
-echo '<script>window.location.href = "register.html";</script>';
-exit;
+readfile('register.html');
+?>

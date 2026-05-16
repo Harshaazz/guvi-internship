@@ -1,4 +1,3 @@
 <?php
-// Temporary placeholder for Railway deployment.
-// Original database connections are disabled.
+// Temporary placeholder to disable DB connections during deployment.
 ?>
