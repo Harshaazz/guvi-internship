@@ -1,3 +1,0 @@
-<?php
-readfile('register.html');
-?>
