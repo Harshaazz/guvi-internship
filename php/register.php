@@ -4,6 +4,22 @@ ini_set('display_errors', 1);
 
 header('Content-Type: application/json');
 
+// Read JSON sent from jQuery AJAX
+$data = json_decode(file_get_contents("php://input"), true);
+
+$user = trim($data['username'] ?? '');
+$email = trim($data['email'] ?? '');
+$pass = trim($data['password'] ?? '');
+
+// Validate input
+if ($user === '' || $email === '' || $pass === '') {
+    echo json_encode([
+        "status" => "error",
+        "message" => "All fields are required."
+    ]);
+    exit;
+}
+
 // Database connection
 $host = getenv('MYSQLHOST');
 $port = getenv('MYSQLPORT') ?: 3306;
@@ -21,25 +37,13 @@ if ($conn->connect_error) {
     exit;
 }
 
-// Get POST data
-$user = trim($_POST['username'] ?? '');
-$email = trim($_POST['email'] ?? '');
-$pass = trim($_POST['password'] ?? '');
-
-// Validate input
-if ($user === '' || $email === '' || $pass === '') {
-    echo json_encode([
-        "status" => "error",
-        "message" => "All fields are required."
-    ]);
-    exit;
-}
-
 // Hash password
 $hashedPassword = password_hash($pass, PASSWORD_DEFAULT);
 
-// Insert user
-$stmt = $conn->prepare("INSERT INTO users (username, email, password) VALUES (?, ?, ?)");
+// Prepared statement
+$stmt = $conn->prepare(
+    "INSERT INTO users (username, email, password) VALUES (?, ?, ?)"
+);
 
 if (!$stmt) {
     echo json_encode([
