@@ -1,6 +1,5 @@
 FROM php:8.2-apache
 
-# Copy project files to Apache web root
 COPY . /var/www/html/
 
 # Make register.html the default page
