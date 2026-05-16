@@ -1,5 +1,10 @@
 [phases.setup]
-nixPkgs = ["php83", "php83Packages.composer"]
+nixPkgs = [
+  "php83",
+  "php83Packages.composer",
+  "php83Extensions.mongodb",
+  "php83Extensions.redis"
+]
 
 [phases.install]
 cmds = ["composer install --no-dev"]
