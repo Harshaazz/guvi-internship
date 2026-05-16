@@ -1,0 +1,39 @@
+/* css/style.css */
+/* Uses only one custom font (Arial) and works alongside Bootstrap */
+
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f8f9fa;
+}
+
+.card {
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.card-header {
+    background-color: #0d6efd;
+    color: #ffffff;
+    font-weight: 600;
+    text-align: center;
+    border-top-left-radius: 12px;
+    border-top-right-radius: 12px;
+}
+
+.form-control {
+    border-radius: 8px;
+}
+
+.btn {
+    border-radius: 8px;
+    font-weight: 500;
+}
+
+.alert {
+    border-radius: 8px;
+}
+
+.container {
+    margin-top: 50px;
+}
