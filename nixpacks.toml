@@ -1,8 +1,12 @@
 [phases.setup]
 nixPkgs = [
   "php83",
-  "php83Extensions.mongodb",
   "php83Extensions.redis"
+]
+
+[phases.install]
+cmds = [
+  "composer install --ignore-platform-req=ext-mongodb --no-dev --optimize-autoloader"
 ]
 
 [start]
