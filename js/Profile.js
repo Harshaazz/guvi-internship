@@ -1,71 +1,76 @@
-let currentToken = null;
+$(document).ready(function () {
+    const token = localStorage.getItem('token');
 
-$(document).ready(function() {
-    currentToken = localStorage.getItem('token');
-    if (!currentToken) {
+    if (!token) {
         window.location.href = 'login.html';
         return;
     }
 
-    loadProfile();
-
-    $('#profileForm').on('submit', function(e) {
-        e.preventDefault();
-        updateProfile();
-    });
-});
-
-function loadProfile() {
+    // Load profile data
     $.ajax({
         url: 'php/profile.php',
-        method: 'POST',
+        type: 'POST',
         contentType: 'application/json',
-        data: JSON.stringify({ action: 'get', token: currentToken }),
-        success: function(res) {
+        dataType: 'json',
+        data: JSON.stringify({
+            token: token,
+            action: 'get'
+        }),
+        success: function (res) {
             if (res.status === 'success') {
-                $('#username').val(res.user.username);
-                $('#email').val(res.user.email);
-                
+                $('#username').val(res.user.username || '');
+                $('#email').val(res.user.email || '');
+
                 if (res.profile) {
-                    $('[name="age"]').val(res.profile.age);
-                    $('[name="dob"]').val(res.profile.dob);
-                    $('[name="contact"]').val(res.profile.contact);
-                    $('[name="address"]').val(res.profile.address);
+                    $('#age').val(res.profile.age || '');
+                    $('#dob').val(res.profile.dob || '');
+                    $('#contact').val(res.profile.contact || '');
+                    $('#address').val(res.profile.address || '');
                 }
             } else {
-                alert(res.message || 'Session expired');
-                logout();
+                alert(res.message);
             }
+        },
+        error: function (xhr) {
+            console.log(xhr.responseText);
+            alert('Failed to load profile.');
         }
     });
-}
 
-function updateProfile() {
-    const profileData = {
-        token: currentToken,
-        action: 'update',
-        age: $('[name="age"]').val(),
-        dob: $('[name="dob"]').val(),
-        contact: $('[name="contact"]').val(),
-        address: $('[name="address"]').val()
-    };
+    // Update profile
+    $('#profileForm').on('submit', function (e) {
+        e.preventDefault();
 
-    $.ajax({
-        url: 'php/profile.php',
-        method: 'POST',
-        contentType: 'application/json',
-        data: JSON.stringify(profileData),
-        success: function(res) {
-            if (res.status === 'success') {
-                $('#profileMessage').html('<div class="alert alert-success">Profile updated successfully!</div>');
-            } else {
-                $('#profileMessage').html('<div class="alert alert-danger">' + res.message + '</div>');
+        $.ajax({
+            url: 'php/profile.php',
+            type: 'POST',
+            contentType: 'application/json',
+            dataType: 'json',
+            data: JSON.stringify({
+                token: token,
+                action: 'update',
+                age: $('#age').val(),
+                dob: $('#dob').val(),
+                contact: $('#contact').val(),
+                address: $('#address').val()
+            }),
+            success: function (res) {
+                if (res.status === 'success') {
+                    alert('Profile updated successfully!');
+                } else {
+                    alert(res.message);
+                }
+            },
+            error: function (xhr) {
+                console.log(xhr.responseText);
+                alert('Failed to update profile.');
             }
-        }
+        });
     });
-}
 
-function logout() {
-    localStorage.clear();
-    window.location.href = 'login.html';
-}
+    // Logout
+    $('#logoutBtn').click(function () {
+        localStorage.removeItem('token');
+        window.location.href = 'login.html';
+    });
+});
