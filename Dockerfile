@@ -1,9 +1,11 @@
-FROM nginx:alpine
+FROM php:8.2-apache
 
-# Remove default nginx page
-RUN rm -rf /usr/share/nginx/html/*
+# Enable Apache rewrite module (optional but useful)
+RUN a2enmod rewrite
 
-# Copy your project files
-COPY . /usr/share/nginx/html/
+# Copy all project files into Apache web root
+COPY . /var/www/html/
 
-EXPOSE 80
+# Set the default page to register.html
+RUN echo 'DirectoryIndex register.html index.php index.html' > /etc/apache2/conf-available/directoryindex.conf \
+    && a2enconf directoryindex
