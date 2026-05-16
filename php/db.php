@@ -4,14 +4,12 @@ ini_set('display_errors', 1);
 
 header('Content-Type: application/json');
 
-// Read Railway environment variables using getenv()
 $host = getenv('MYSQLHOST');
 $port = getenv('MYSQLPORT') ?: 3306;
 $database = getenv('MYSQLDATABASE');
 $username = getenv('MYSQLUSER');
 $password = getenv('MYSQLPASSWORD');
 
-// Check variables
 if (!$host || !$database || !$username) {
     echo json_encode([
         'status' => 'error',
@@ -25,7 +23,6 @@ if (!$host || !$database || !$username) {
     exit;
 }
 
-// Connect to MySQL
 $conn = new mysqli($host, $username, $password, $database, (int)$port);
 
 if ($conn->connect_error) {
