@@ -1,11 +1,3 @@
 {
-  "require": {
-    "mongodb/mongodb": "^2.3",
-    "predis/predis": "^3.0"
-  },
-  "config": {
-    "platform": {
-      "ext-mongodb": "2.3.0"
-    }
-  }
+    "require": {}
 }
