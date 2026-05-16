@@ -4,14 +4,56 @@ ini_set('display_errors', 1);
 
 header('Content-Type: application/json');
 
-echo json_encode([
-    'status' => 'debug',
-    'message' => 'Debug Info',
-    'MYSQLHOST' => !empty($_ENV['MYSQLHOST']) ? 'Present' : 'Missing',
-    'MYSQLUSER' => !empty($_ENV['MYSQLUSER']) ? 'Present' : 'Missing',
-    'MYSQLDATABASE' => !empty($_ENV['MYSQLDATABASE']) ? 'Present' : 'Missing',
-    'All_ENV_Keys' => array_keys($_ENV)
-], JSON_PRETTY_PRINT);
+try {
+    // Read Railway environment variables
+    $host = getenv('MYSQLHOST');
+    $port = getenv('MYSQLPORT') ?: 3306;
+    $database = getenv('MYSQLDATABASE');
+    $username = getenv('MYSQLUSER');
+    $password = getenv('MYSQLPASSWORD');
 
-exit;
+    // Check if required variables exist
+    if (!$host || !$database || !$username) {
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'MySQL environment variables are missing.',
+            'MYSQLHOST' => $host ? 'Present' : 'Missing',
+            'MYSQLPORT' => $port ? 'Present' : 'Missing',
+            'MYSQLDATABASE' => $database ? 'Present' : 'Missing',
+            'MYSQLUSER' => $username ? 'Present' : 'Missing',
+            'MYSQLPASSWORD' => $password ? 'Present' : 'Missing'
+        ], JSON_PRETTY_PRINT);
+        exit;
+    }
+
+    // Create MySQL connection
+    $conn = new mysqli($host, $username, $password, $database, $port);
+
+    // Check connection
+    if ($conn->connect_error) {
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'Database connection failed.',
+            'error' => $conn->connect_error
+        ], JSON_PRETTY_PRINT);
+        exit;
+    }
+
+    // Success
+    echo json_encode([
+        'status' => 'success',
+        'message' => 'Database connected successfully!',
+        'host' => $host,
+        'database' => $database
+    ], JSON_PRETTY_PRINT);
+
+    $conn->close();
+
+} catch (Exception $e) {
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'Exception occurred.',
+        'error' => $e->getMessage()
+    ], JSON_PRETTY_PRINT);
+}
 ?>
