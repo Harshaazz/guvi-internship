@@ -1,19 +1,45 @@
-<?php
+]<?php
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 header('Content-Type: application/json');
 require_once 'db.php';
 
-// Read JSON data from AJAX
+/*
+|--------------------------------------------------------------------------
+| Read JSON Input
+|--------------------------------------------------------------------------
+*/
 $data = json_decode(file_get_contents('php://input'), true);
 
-// Get token and action
-$token = $data['token'] ?? '';
-$action = $data['action'] ?? '';
-
-// Validate session token
-if (empty($token) || !$redis) {
+if (!$data) {
     echo json_encode([
         'status' => 'error',
-        'message' => 'Session expired. Please login again.'
+        'message' => 'Invalid JSON data.'
+    ]);
+    exit;
+}
+
+$token  = trim($data['token'] ?? '');
+$action = trim($data['action'] ?? '');
+
+/*
+|--------------------------------------------------------------------------
+| Validate Session Token (Stored in Redis)
+|--------------------------------------------------------------------------
+*/
+if ($token === '') {
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'Session token is missing.'
+    ]);
+    exit;
+}
+
+if (!$redis) {
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'Redis connection is not available.'
     ]);
     exit;
 }
@@ -28,8 +54,15 @@ if (!$sessionData) {
     exit;
 }
 
-// Decode user data from Redis
 $user = json_decode($sessionData, true);
+
+if (!$user || empty($user['email'])) {
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'Invalid session data.'
+    ]);
+    exit;
+}
 
 /*
 |--------------------------------------------------------------------------
@@ -37,7 +70,7 @@ $user = json_decode($sessionData, true);
 |--------------------------------------------------------------------------
 */
 if ($action === 'get') {
-    // Find profile in MongoDB using email as unique key
+
     $profile = null;
 
     if ($mongoCollection) {
@@ -46,19 +79,25 @@ if ($action === 'get') {
         ]);
     }
 
-    // Return user data + profile data
+    $profileData = null;
+
+    if ($profile) {
+        $profileData = [
+            'age'     => $profile['age'] ?? '',
+            'dob'     => $profile['dob'] ?? '',
+            'contact' => $profile['contact'] ?? '',
+            'address' => $profile['address'] ?? ''
+        ];
+    }
+
     echo json_encode([
         'status' => 'success',
         'user' => [
+            'id'       => $user['id'] ?? null,
             'username' => $user['username'] ?? '',
-            'email' => $user['email'] ?? ''
+            'email'    => $user['email'] ?? ''
         ],
-        'profile' => $profile ? [
-            'age' => $profile['age'] ?? '',
-            'dob' => $profile['dob'] ?? '',
-            'contact' => $profile['contact'] ?? '',
-            'address' => $profile['address'] ?? ''
-        ] : null
+        'profile' => $profileData
     ]);
     exit;
 }
@@ -70,13 +109,28 @@ if ($action === 'get') {
 */
 if ($action === 'update') {
 
-    // Read submitted fields
-    $age = trim($data['age'] ?? '');
-    $dob = trim($data['dob'] ?? '');
-    $contact = trim($data['contact'] ?? '');
-    $address = trim($data['address'] ?? '');
+    // Read submitted data
+    $newUsername = trim($data['username'] ?? ($user['username'] ?? ''));
+    $newEmail    = trim($data['email'] ?? ($user['email'] ?? ''));
+    $age         = trim($data['age'] ?? '');
+    $dob         = trim($data['dob'] ?? '');
+    $contact     = trim($data['contact'] ?? '');
+    $address     = trim($data['address'] ?? '');
 
-    // Validate MongoDB connection
+    // Validate required fields
+    if ($newUsername === '' || $newEmail === '') {
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'Username and email are required.'
+        ]);
+        exit;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Update MongoDB Profile
+    |--------------------------------------------------------------------------
+    */
     if (!$mongoCollection) {
         echo json_encode([
             'status' => 'error',
@@ -85,9 +139,8 @@ if ($action === 'update') {
         exit;
     }
 
-    // Save profile in MongoDB
-    $updateData = [
-        'user_id'    => $user['email'], // Use email as unique key
+    $profileData = [
+        'user_id'    => $newEmail,
         'age'        => ($age === '') ? null : (int)$age,
         'dob'        => $dob,
         'contact'    => $contact,
@@ -96,29 +149,34 @@ if ($action === 'update') {
     ];
 
     $mongoCollection->updateOne(
-        ['user_id' => $user['email']],
-        ['$set' => $updateData],
+        ['user_id' => $user['email']],   // Find existing profile by old email
+        ['$set' => $profileData],
         ['upsert' => true]
     );
 
-    // Update username/email in Redis if changed in frontend
-    $newUsername = trim($data['username'] ?? $user['username']);
-    $newEmail = trim($data['email'] ?? $user['email']);
-
+    /*
+    |--------------------------------------------------------------------------
+    | Update Session Data in Redis
+    |--------------------------------------------------------------------------
+    */
     $updatedUser = [
-        'id' => $user['id'] ?? null,
+        'id'       => $user['id'] ?? null,
         'username' => $newUsername,
-        'email' => $newEmail
+        'email'    => $newEmail
     ];
 
-    // Save updated session back to Redis
+    // Save session back to Redis for another 24 hours
     $redis->setex(
         "session:$token",
         86400,
         json_encode($updatedUser)
     );
 
-    // Return success
+    /*
+    |--------------------------------------------------------------------------
+    | Success Response
+    |--------------------------------------------------------------------------
+    */
     echo json_encode([
         'status' => 'success',
         'message' => 'Profile updated successfully.'
@@ -128,7 +186,7 @@ if ($action === 'update') {
 
 /*
 |--------------------------------------------------------------------------
-| INVALID ACTION
+| Invalid Action
 |--------------------------------------------------------------------------
 */
 echo json_encode([
