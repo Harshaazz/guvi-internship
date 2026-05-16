@@ -1,83 +1,40 @@
 <?php
-header('Content-Type: application/json');
-require 'db.php';
+require_once 'db.php';
 
-// Get token
-$token = $_POST['token'] ?? '';
+$data = json_decode(file_get_contents('php://input'), true);
+$token = $data['token'] ?? '';
+$action = $data['action'] ?? '';
 
-// Validate token in Redis
-$userId = $redis->get("session:$token");
-
-if (!$userId) {
-    echo json_encode([
-        'status' => 'error',
-        'message' => 'Invalid or expired session'
-    ]);
+if (empty($token) || !$redis || !($sessionData = $redis->get("session:$token"))) {
+    echo json_encode(['status' => 'error', 'message' => 'Session expired. Please login again.']);
     exit;
 }
 
-// Determine action
-$action = $_POST['action'] ?? 'get';
+$user = json_decode($sessionData, true);
 
-// MongoDB collection
-$collection = $mongoDb->profiles;
-
-// ====================== GET PROFILE ======================
 if ($action === 'get') {
-    $profile = $collection->findOne(['user_id' => (int)$userId]);
-
-    if ($profile) {
-        echo json_encode([
-            'status' => 'success',
-            'data' => [
-                'age' => $profile['age'] ?? '',
-                'dob' => $profile['dob'] ?? '',
-                'contact' => $profile['contact'] ?? '',
-                'address' => $profile['address'] ?? ''
-            ]
-        ]);
-    } else {
-        echo json_encode([
-            'status' => 'success',
-            'data' => null
-        ]);
-    }
-
-    exit;
-}
-
-// ====================== UPDATE PROFILE ======================
-if ($action === 'update') {
-    $age = $_POST['age'] ?? '';
-    $dob = $_POST['dob'] ?? '';
-    $contact = $_POST['contact'] ?? '';
-    $address = $_POST['address'] ?? '';
-
-    $collection->updateOne(
-        ['user_id' => (int)$userId],
-        [
-            '$set' => [
-                'user_id' => (int)$userId,
-                'age' => $age,
-                'dob' => $dob,
-                'contact' => $contact,
-                'address' => $address
-            ]
-        ],
-        ['upsert' => true]
-    );
-
+    $profile = $mongoCollection ? $mongoCollection->findOne(['user_id' => $user['email']]) : null;
     echo json_encode([
         'status' => 'success',
-        'message' => 'Profile updated successfully'
+        'user' => $user,
+        'profile' => $profile ? (array)$profile : null
     ]);
-
-    exit;
+} 
+elseif ($action === 'update') {
+    if ($mongoCollection) {
+        $updateData = [
+            'age' => (int)($data['age'] ?? 0),
+            'dob' => $data['dob'] ?? '',
+            'contact' => $data['contact'] ?? '',
+            'address' => $data['address'] ?? '',
+            'updated_at' => new MongoDB\BSON\UTCDateTime()
+        ];
+        $mongoCollection->updateOne(
+            ['user_id' => $user['email']],
+            ['$set' => $updateData],
+            ['upsert' => true]
+        );
+    }
+    echo json_encode(['status' => 'success', 'message' => 'Profile updated successfully']);
 }
-
-// ====================== INVALID ACTION ======================
-echo json_encode([
-    'status' => 'error',
-    'message' => 'Invalid action'
-]);
 ?>

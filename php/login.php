@@ -1,24 +1,34 @@
 <?php
-header('Content-Type: application/json');
-require 'db.php';
+require_once 'db.php';
 
-$email = $_POST['email'] ?? '';
-$password = $_POST['password'] ?? '';
+$data = json_decode(file_get_contents('php://input'), true);
 
-$stmt = $mysqli->prepare("SELECT id, password FROM users WHERE email = ?");
-$stmt->bind_param("s", $email);
-$stmt->execute();
-$stmt->bind_result($id, $hashed);
-$stmt->fetch();
+$email = trim($data['email'] ?? '');
+$password = $data['password'] ?? '';
 
-if ($id && password_verify($password, $hashed)) {
+$stmt = $pdo->prepare("SELECT id, username, password FROM users WHERE email = ?");
+$stmt->execute([$email]);
+$user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+if ($user && password_verify($password, $user['password'])) {
     $token = bin2hex(random_bytes(32));
     
-    // Store in Redis
-    $redis->setex("session:$token", 3600, $id); // 1 hour expiry
-    
-    echo json_encode(['status' => 'success', 'token' => $token]);
+    $sessionData = json_encode([
+        'user_id' => $user['id'],
+        'username' => $user['username'],
+        'email' => $email
+    ]);
+
+    if ($redis) {
+        $redis->setex("session:$token", 86400 * 7, $sessionData); // 7 days
+    }
+
+    echo json_encode([
+        'status' => 'success',
+        'token' => $token,
+        'user' => ['username' => $user['username'], 'email' => $email]
+    ]);
 } else {
-    echo json_encode(['status' => 'error', 'message' => 'Invalid credentials']);
+    echo json_encode(['status' => 'error', 'message' => 'Invalid email or password']);
 }
 ?>
