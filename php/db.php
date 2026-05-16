@@ -4,7 +4,12 @@ header('Content-Type: application/json');
 require_once __DIR__ . '/../vendor/autoload.php';
 
 // ====================== MySQL ======================
-$mysqli = new mysqli("localhost", "root", "", "guvi_intern");
+$mysql_host = getenv('MYSQLHOST') ?: getenv('DB_HOST') ?: 'localhost';
+$mysql_user = getenv('MYSQLUSER') ?: getenv('DB_USER') ?: 'root';
+$mysql_pass = getenv('MYSQLPASSWORD') ?: getenv('DB_PASSWORD') ?: '';
+$mysql_db   = getenv('MYSQLDATABASE') ?: getenv('DB_DATABASE') ?: 'guvi_intern';
+
+$mysqli = new mysqli($mysql_host, $mysql_user, $mysql_pass, $mysql_db);
 
 if ($mysqli->connect_error) {
     die(json_encode([
@@ -13,10 +18,13 @@ if ($mysqli->connect_error) {
     ]));
 }
 
+$mysqli->set_charset("utf8mb4");
+
 // ====================== MongoDB ======================
 try {
-    $client = new MongoDB\Client("mongodb://localhost:27017");
-    $mongoDb = $client->guvi_intern;
+    $mongo_uri = getenv('MONGO_URL') ?: getenv('MONGODB_URL') ?: "mongodb://localhost:27017";
+    $client = new MongoDB\Client($mongo_uri);
+    $mongoDb = $client->guvi_intern;   // Change database name if needed
 } catch (Exception $e) {
     die(json_encode([
         'status' => 'error',
@@ -26,19 +34,23 @@ try {
 
 // ====================== Redis ======================
 try {
+    $redis_host = getenv('REDISHOST') ?: getenv('REDIS_HOST') ?: '127.0.0.1';
+    $redis_port = getenv('REDISPORT') ?: getenv('REDIS_PORT') ?: 6379;
+    
     $redis = new Predis\Client([
         'scheme' => 'tcp',
-        'host'   => '127.0.0.1',
-        'port'   => 6379,
+        'host'   => $redis_host,
+        'port'   => $redis_port,
     ]);
 
-    // Test Redis connection
-    $redis->ping();
-
+    $redis->ping(); // Test connection
 } catch (Exception $e) {
     die(json_encode([
         'status' => 'error',
         'message' => 'Redis Connection Failed: ' . $e->getMessage()
     ]));
 }
+
+// If all connections successful
+// echo json_encode(['status' => 'success', 'message' => 'All DBs Connected']);
 ?>
