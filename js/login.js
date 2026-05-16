@@ -1,5 +1,5 @@
-$(document).ready(function() {
-    $('#loginForm').on('submit', function(e) {
+$(document).ready(function () {
+    $('#loginForm').on('submit', function (e) {
         e.preventDefault();
 
         const formData = {
@@ -7,26 +7,35 @@ $(document).ready(function() {
             password: $('[name="password"]').val()
         };
 
-        $('#loginBtn').prop('disabled', true).html('Logging in...');
+        $('#loginBtn').prop('disabled', true).text('Logging in...');
 
         $.ajax({
             url: 'php/login.php',
             method: 'POST',
             contentType: 'application/json',
+            dataType: 'json',
             data: JSON.stringify(formData),
-            success: function(response) {
-                if(response.status === 'success') {
-                    localStorage.setItem('token', response.token);
-                    localStorage.setItem('user', JSON.stringify(response.user));
+
+            success: function (res) {
+                if (res.status === 'success') {
+                    // IMPORTANT: Must match profile.js
+                    localStorage.setItem('session_token', res.token);
+
                     window.location.href = 'profile.html';
                 } else {
-                    $('#loginMessage').html('<div class="alert alert-danger">' + response.message + '</div>');
+                    $('#loginMessage').html(
+                        `<div class="alert alert-danger">${res.message}</div>`
+                    );
                 }
             },
-            error: function() {
-                $('#loginMessage').html('<div class="alert alert-danger">Login failed. Try again.</div>');
+
+            error: function () {
+                $('#loginMessage').html(
+                    '<div class="alert alert-danger">Login failed. Try again.</div>'
+                );
             },
-            complete: function() {
+
+            complete: function () {
                 $('#loginBtn').prop('disabled', false).text('Login');
             }
         });
