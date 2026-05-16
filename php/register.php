@@ -1,9 +1,10 @@
 <?php
-// Enable error display for debugging (remove later)
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
 require_once 'db.php';
+
+header('Content-Type: application/json');
 
 $data = json_decode(file_get_contents('php://input'), true);
 
@@ -24,8 +25,14 @@ try {
     $stmt->execute([$username, $email, $hashed]);
     echo json_encode(['status' => 'success', 'message' => 'Registration successful! Please login.']);
 } catch (PDOException $e) {
-    echo json_encode(['status' => 'error', 'message' => 'Username or Email already exists']);
+    echo json_encode([
+        'status' => 'error', 
+        'message' => 'Database Error: ' . $e->getMessage()
+    ]);
 } catch (Exception $e) {
-    echo json_encode(['status' => 'error', 'message' => 'Server error: ' . $e->getMessage()]);
+    echo json_encode([
+        'status' => 'error', 
+        'message' => 'Server Error: ' . $e->getMessage()
+    ]);
 }
 ?>
