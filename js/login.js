@@ -1,3 +1,5 @@
+// js/login.js
+
 $(document).ready(function () {
     $('#loginForm').on('submit', function (e) {
         e.preventDefault();
@@ -14,7 +16,7 @@ $(document).ready(function () {
 
         $.ajax({
             url: 'php/login.php',
-            type: 'POST',
+            method: 'POST',
             contentType: 'application/json',
             dataType: 'json',
             data: JSON.stringify({
@@ -23,38 +25,33 @@ $(document).ready(function () {
             }),
 
             success: function (res) {
-                // Handle response if returned as string
-                if (typeof res === 'string') {
-                    try {
-                        res = JSON.parse(res);
-                    } catch (e) {
-                        alert('Invalid server response.');
-                        return;
-                    }
-                }
+                console.log('Login response:', res);
 
                 if (res.status === 'success') {
-                    // Save session token
+                    // Save ONLY one token
                     localStorage.setItem('token', res.token);
 
-                    // Save user object
+                    // Save user info
                     if (res.user) {
-                        localStorage.setItem('user', JSON.stringify(res.user));
+                        localStorage.setItem(
+                            'user',
+                            JSON.stringify(res.user)
+                        );
                     }
 
-                    // Remove old token key if it exists
+                    // Remove old token key if present
                     localStorage.removeItem('session_token');
 
-                    // Redirect to profile page
-                    window.location.href = 'profile.html';
+                    // Force redirect
+                    window.location.replace('profile.html');
                 } else {
                     alert(res.message || 'Login failed.');
                 }
             },
 
             error: function (xhr) {
-                console.log(xhr.responseText);
-                alert('Login failed. Please try again.');
+                console.log('Server response:', xhr.responseText);
+                alert('Login failed. Check console for details.');
             },
 
             complete: function () {
