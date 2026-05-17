@@ -1,10 +1,13 @@
 document.addEventListener('DOMContentLoaded', function () {
     loadProfile();
 
-    document.getElementById('profileForm').addEventListener('submit', function (e) {
-        e.preventDefault();
-        updateProfile();
-    });
+    const form = document.getElementById('profileForm');
+    if (form) {
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            updateProfile();
+        });
+    }
 });
 
 function loadProfile() {
@@ -36,15 +39,23 @@ function loadProfile() {
         }
 
         // User data
-        document.getElementById('username').value = data.user?.username || '';
-        document.getElementById('email').value = data.user?.email || '';
+        const username = document.getElementById('username');
+        const email = document.getElementById('email');
+
+        if (username) username.value = data.user?.username || '';
+        if (email) email.value = data.user?.email || '';
 
         // Profile data
         if (data.profile) {
-            document.getElementById('age').value = data.profile.age || '';
-            document.getElementById('dob').value = data.profile.dob || '';
-            document.getElementById('contact').value = data.profile.contact || '';
-            document.getElementById('address').value = data.profile.address || '';
+            const age = document.getElementById('age');
+            const dob = document.getElementById('dob');
+            const contact = document.getElementById('contact');
+            const address = document.getElementById('address');
+
+            if (age) age.value = data.profile.age || '';
+            if (dob) dob.value = data.profile.dob || '';
+            if (contact) contact.value = data.profile.contact || '';
+            if (address) address.value = data.profile.address || '';
         }
     })
     .catch(error => {
@@ -56,6 +67,18 @@ function loadProfile() {
 function updateProfile() {
     const token = localStorage.getItem('token');
 
+    if (!token) {
+        alert('Please login again.');
+        window.location.href = 'login.html';
+        return;
+    }
+
+    // Safely read field values
+    const age = document.getElementById('age')?.value || '';
+    const dob = document.getElementById('dob')?.value || '';
+    const contact = document.getElementById('contact')?.value || '';
+    const address = document.getElementById('address')?.value || '';
+
     fetch('php/profile.php', {
         method: 'POST',
         headers: {
@@ -64,16 +87,21 @@ function updateProfile() {
         body: JSON.stringify({
             token: token,
             action: 'update',
-            age: document.getElementById('age').value,
-            dob: document.getElementById('dob').value,
-            contact: document.getElementById('contact').value,
-            address: document.getElementById('address').value
+            age: age,
+            dob: dob,
+            contact: contact,
+            address: address
         })
     })
     .then(response => response.json())
     .then(data => {
         console.log('Update response:', data);
-        alert(data.message || 'Profile updated.');
+
+        if (data.status === 'success') {
+            alert(data.message || 'Profile updated successfully.');
+        } else {
+            alert(data.message || 'Failed to update profile.');
+        }
     })
     .catch(error => {
         console.error('Update profile error:', error);
