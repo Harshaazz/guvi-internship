@@ -7,52 +7,31 @@ header('Content-Type: application/json');
 
 require_once 'db.php';
 
-$data = json_decode(file_get_contents('php://input'), true);
+/*
+|--------------------------------------------------------------------------
+| Read JSON Input Safely
+|--------------------------------------------------------------------------
+*/
+$raw = file_get_contents('php://input');
+$data = json_decode($raw, true);
 
-if (!$data) {
-    echo json_encode([
-        'status' => 'error',
-        'message' => 'Invalid JSON input.'
-    ]);
-    exit;
+// If no JSON was sent (e.g., opening login.php directly), use empty array
+if (!is_array($data)) {
+    $data = [];
 }
 
 $email = trim($data['email'] ?? '');
 $password = $data['password'] ?? '';
 
-if (empty($email) || empty($password)) {
+// Only require email/password for actual login requests
+if ($email === '' || $password === '') {
     echo json_encode([
         'status' => 'error',
-        'message' => 'All fields are required.'
+        'message' => 'Email and password are required.'
     ]);
     exit;
 }
 
-$stmt = $conn->prepare(
-    "SELECT username, email, password FROM users WHERE email = ?"
-);
-$stmt->bind_param("s", $email);
-$stmt->execute();
-
-$result = $stmt->get_result();
-
-if ($result->num_rows !== 1) {
-    echo json_encode([
-        'status' => 'error',
-        'message' => 'Invalid email or password.'
-    ]);
-    exit;
-}
-
-$user = $result->fetch_assoc();
-
-if (!password_verify($password, $user['password'])) {
-    echo json_encode([
-        'status' => 'error',
-        'message' => 'Invalid email or password.'
-    ]);
-    exit;
-}
 
 /*
 |--------------------------------------------------------------------------
@@ -66,7 +45,6 @@ $token = bin2hex(random_bytes(32));
 | Store session using PHP Session
 |--------------------------------------------------------------------------
 */
-session_start();
 
 $_SESSION['user'] = [
     'username' => $user['username'],
