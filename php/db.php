@@ -1,58 +1,28 @@
 <?php
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
+require_once __DIR__ . '/../vendor/autoload.php';
+
+use Predis\Client as PredisClient;
 
 /*
 |--------------------------------------------------------------------------
 | MySQL Connection
 |--------------------------------------------------------------------------
-| This file should ONLY create the database connection.
-| It must NOT echo or print anything.
 */
-
 $host = getenv('MYSQLHOST');
 $port = getenv('MYSQLPORT') ?: 3306;
 $database = getenv('MYSQLDATABASE') ?: getenv('MYSQL_DATABASE');
 $username = getenv('MYSQLUSER');
 $password = getenv('MYSQLPASSWORD');
 
-/*
-|--------------------------------------------------------------------------
-| Validate Environment Variables
-|--------------------------------------------------------------------------
-*/
-if (!$host || !$database || !$username) {
-    die('MySQL environment variables are missing.');
+$conn = null;
+
+if ($host && $database && $username) {
+    $conn = new mysqli($host, $username, $password, $database, (int)$port);
+
+    if ($conn->connect_error) {
+        $conn = null;
+    }
 }
-
-/*
-|--------------------------------------------------------------------------
-| Create MySQL Connection
-|--------------------------------------------------------------------------
-*/
-$conn = new mysqli(
-    $host,
-    $username,
-    $password,
-    $database,
-    (int)$port
-);
-
-/*
-|--------------------------------------------------------------------------
-| Check Connection
-|--------------------------------------------------------------------------
-*/
-if ($conn->connect_error) {
-    die('Database connection failed: ' . $conn->connect_error);
-}
-
-/*
-|--------------------------------------------------------------------------
-| Set Charset
-|--------------------------------------------------------------------------
-*/
-$conn->set_charset('utf8mb4');
 
 /*
 |--------------------------------------------------------------------------
@@ -62,27 +32,15 @@ $conn->set_charset('utf8mb4');
 $mongoCollection = null;
 
 try {
-    if (class_exists('MongoDB\Client')) {
-        $mongoUri = getenv('MONGO_URL')
-            ?: getenv('MONGODB_URI')
-            ?: getenv('MONGO_URI');
+    $mongoHost = getenv('MONGOHOST') ?: 'mongodb';
+    $mongoPort = getenv('MONGOPORT') ?: 27017;
+    $mongoDatabase = getenv('MONGODB_DATABASE') ?: 'guvi';
+    $mongoUri = "mongodb://{$mongoHost}:{$mongoPort}";
 
-        if ($mongoUri) {
-            require_once __DIR__ . '/../vendor/autoload.php';
-
-            $mongoClient = new MongoDB\Client($mongoUri);
-
-            // Database name from Railway variable or default
-            $mongoDbName = getenv('MONGO_DATABASE') ?: 'guvi';
-
-            // Collection used for user profiles
-            $mongoCollection = $mongoClient
-                ->selectDatabase($mongoDbName)
-                ->selectCollection('profiles');
-        }
-    }
+    $mongoClient = new MongoDB\Client($mongoUri);
+    $mongoDb = $mongoClient->$mongoDatabase;
+    $mongoCollection = $mongoDb->profiles;
 } catch (Exception $e) {
-    // Keep application running even if MongoDB is unavailable
     $mongoCollection = null;
 }
 
@@ -94,18 +52,25 @@ try {
 $redis = null;
 
 try {
-    if (class_exists('Predis\Client')) {
-        require_once __DIR__ . '/../vendor/autoload.php';
+    $redisHost = getenv('REDISHOST') ?: 'redis';
+    $redisPort = getenv('REDISPORT') ?: 6379;
+    $redisPassword = getenv('REDISPASSWORD') ?: null;
 
-        $redisUrl = getenv('REDIS_URL');
+    $params = [
+        'scheme' => 'tcp',
+        'host'   => $redisHost,
+        'port'   => (int)$redisPort,
+    ];
 
-        if ($redisUrl) {
-            $redis = new Predis\Client($redisUrl);
-            $redis->connect();
-        }
+    if (!empty($redisPassword)) {
+        $params['password'] = $redisPassword;
     }
+
+    $redis = new PredisClient($params);
+
+    // Test connection
+    $redis->ping();
 } catch (Exception $e) {
-    // Keep application running even if Redis is unavailable
     $redis = null;
 }
 ?>
