@@ -27,6 +27,7 @@ function loadProfile() {
         },
         body: JSON.stringify({
             token: token,
+            user: localStorage.getItem('user'),
             action: 'update',
             age: document.getElementById('age').value,
             dob: document.getElementById('dob').value,

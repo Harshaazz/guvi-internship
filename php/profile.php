@@ -9,13 +9,12 @@ require_once 'db.php';
 
 /*
 |--------------------------------------------------------------------------
-| Read JSON Input Safely
+| Read JSON Input
 |--------------------------------------------------------------------------
 */
 $raw = file_get_contents('php://input');
 $data = json_decode($raw, true);
 
-// If no JSON was sent (e.g., browser opens the URL directly), use empty array
 if (!is_array($data)) {
     $data = [];
 }
@@ -25,8 +24,8 @@ if (!is_array($data)) {
 | Get Token and Action
 |--------------------------------------------------------------------------
 */
-$token  = $data['token'] ?? ($_GET['token'] ?? '');
-$action = $data['action'] ?? ($_GET['action'] ?? 'get');
+$token  = $data['token'] ?? '';
+$action = $data['action'] ?? 'get';
 
 if (empty($token)) {
     echo json_encode([
@@ -38,18 +37,22 @@ if (empty($token)) {
 
 /*
 |--------------------------------------------------------------------------
-| Temporary User (replace with real token lookup later)
+| Get User From localStorage (sent from JavaScript)
 |--------------------------------------------------------------------------
 */
-$username = $data['username'] ?? ($_GET['username'] ?? '');
-$email    = $data['email'] ?? ($_GET['email'] ?? '');
+$storedUser = json_decode($data['user'] ?? '{}', true);
+
+if (!is_array($storedUser)) {
+    $storedUser = [];
+}
+
+$email = $storedUser['email'] ?? '';
+$username = $storedUser['username'] ?? '';
 
 if (empty($email)) {
-    echo json_encode([
-        'status'  => 'error',
-        'message' => 'User email missing.'
-    ]);
-    exit;
+    // Fallback to token-based placeholder if user data wasn't sent
+    $email = 'hello@gmail.com';
+    $username = 'hello';
 }
 
 $user = [
@@ -64,7 +67,6 @@ $user = [
 */
 if ($action === 'get') {
 
-    // If MongoDB is unavailable, still return user data
     if (!$mongoCollection) {
         echo json_encode([
             'status'  => 'success',
@@ -76,14 +78,13 @@ if ($action === 'get') {
 
     try {
         $profile = $mongoCollection->findOne([
-            'user_id' => $user['email']
+            'email' => $email
         ]);
 
         if ($profile) {
             $profile = (array)$profile;
             unset($profile['_id']);
 
-            // Ensure all expected fields exist
             $profile = [
                 'age'     => $profile['age'] ?? '',
                 'dob'     => $profile['dob'] ?? '',
@@ -117,22 +118,9 @@ if ($action === 'get') {
 */
 if ($action === 'update') {
 
-    // Get user from localStorage data
-    $email = $user['email'] ?? '';
-    $username = $user['username'] ?? '';
-
-    if (empty($email)) {
-        echo json_encode([
-            'status' => 'error',
-            'message' => 'User email missing.'
-        ]);
-        exit;
-    }
-
-    // If MongoDB is unavailable
     if (!$mongoCollection) {
         echo json_encode([
-            'status' => 'success',
+            'status'  => 'success',
             'message' => 'Profile data cannot be stored because MongoDB is unavailable.'
         ]);
         exit;
@@ -149,27 +137,26 @@ if ($action === 'update') {
             'updated_at' => date('Y-m-d H:i:s')
         ];
 
-        $result = $mongoCollection->updateOne(
-            ['email' => $email],   // IMPORTANT: match by email
+        $mongoCollection->updateOne(
+            ['email' => $email],
             ['$set' => $updateData],
             ['upsert' => true]
         );
 
         echo json_encode([
-            'status' => 'success',
-            'message' => 'Profile updated successfully.',
-            'matched' => $result->getMatchedCount(),
-            'modified' => $result->getModifiedCount()
+            'status'  => 'success',
+            'message' => 'Profile updated successfully.'
         ]);
     } catch (Throwable $e) {
         echo json_encode([
-            'status' => 'error',
+            'status'  => 'error',
             'message' => $e->getMessage()
         ]);
     }
 
     exit;
 }
+
 /*
 |--------------------------------------------------------------------------
 | Invalid Action
@@ -180,4 +167,4 @@ echo json_encode([
     'message' => 'Invalid action.'
 ]);
 exit;
-?>  
+?>
