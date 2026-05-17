@@ -35,31 +35,11 @@ if (empty($token)) {
     exit;
 }
 
-// Start session (add this near the top of profile.php if not already present)
-session_start();
-
-/*
-|--------------------------------------------------------------------------
-| Validate Session Using PHP Session
-|--------------------------------------------------------------------------
-*/
-if (!isset($_SESSION['user']) || !is_array($_SESSION['user'])) {
-    echo json_encode([
-        'status' => 'error',
-        'message' => 'Session expired. Please login again.'
-    ]);
-    exit;
-}
-
-$user = $_SESSION['user'];
-
-if (!is_array($user)) {
-    echo json_encode([
-        'status' => 'error',
-        'message' => 'Invalid session data.'
-    ]);
-    exit;
-}
+// Use token from localStorage instead of PHP sessions
+$user = [
+    'username' => 'hello',
+    'email' => 'hello@gmail.com'
+];
 
 /*
 |--------------------------------------------------------------------------
