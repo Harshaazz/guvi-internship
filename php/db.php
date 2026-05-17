@@ -44,19 +44,32 @@ if ($mysqlHost && $mysqlDatabase && $mysqlUser) {
 $mongoCollection = null;
 
 try {
-    // Only attempt MongoDB connection if extension is installed
+    // Only attempt MongoDB connection if extension and library are installed
     if (class_exists('MongoDB\\Client') &&
         class_exists('MongoDB\\Driver\\Manager')) {
 
-        $mongoHost = getenv('MONGOHOST') ?: 'mongodb';
-        $mongoPort = getenv('MONGOPORT') ?: 27017;
+        // Use Railway full connection string
+        $mongoUri = getenv('MONGO_URL') ?: getenv('MONGO_PUBLIC_URL');
+
+        // Fallback for local development
+        if (!$mongoUri) {
+            $mongoHost = getenv('MONGOHOST') ?: 'localhost';
+            $mongoPort = getenv('MONGOPORT') ?: 27017;
+            $mongoUri = "mongodb://{$mongoHost}:{$mongoPort}";
+        }
+
+        // Database name to store your data
         $mongoDatabase = getenv('MONGODB_DATABASE') ?: 'guvi';
 
-        $mongoUri = "mongodb://{$mongoHost}:{$mongoPort}";
-
+        // Connect to MongoDB
         $mongoClient = new MongoDB\Client($mongoUri);
-        $mongoDb = $mongoClient->$mongoDatabase;
-        $mongoCollection = $mongoDb->profiles;
+
+        // Select database and collection
+        $mongoDb = $mongoClient->selectDatabase($mongoDatabase);
+        $mongoCollection = $mongoDb->selectCollection('profiles');
+
+        // Test connection
+        $mongoCollection->countDocuments([], ['limit' => 1]);
     }
 } catch (Throwable $e) {
     // Ignore MongoDB errors so login still works
