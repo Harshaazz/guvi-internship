@@ -118,18 +118,16 @@ if ($action === 'get') {
 if ($action === 'update') {
 
     // Get user from localStorage data
-    $storedUser = json_decode($data['user'] ?? '{}', true);
+    $email = $user['email'] ?? '';
+    $username = $user['username'] ?? '';
 
-    if (!is_array($storedUser) || empty($storedUser['email'])) {
+    if (empty($email)) {
         echo json_encode([
             'status' => 'error',
             'message' => 'User email missing.'
         ]);
         exit;
     }
-
-    $email = $storedUser['email'];
-    $username = $storedUser['username'] ?? '';
 
     // If MongoDB is unavailable
     if (!$mongoCollection) {
