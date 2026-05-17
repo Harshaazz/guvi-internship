@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
 function loadProfile() {
     const token = localStorage.getItem('token');
+    const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
 
     if (!token) {
         alert('Please login first.');
@@ -26,7 +27,9 @@ function loadProfile() {
         },
         body: JSON.stringify({
             token: token,
-            action: 'get'
+            action: 'get',
+            username: storedUser.username,
+            email: storedUser.email
         })
     })
     .then(response => response.json())
@@ -66,18 +69,7 @@ function loadProfile() {
 
 function updateProfile() {
     const token = localStorage.getItem('token');
-
-    if (!token) {
-        alert('Please login again.');
-        window.location.href = 'login.html';
-        return;
-    }
-
-    // Safely read field values
-    const age = document.getElementById('age')?.value || '';
-    const dob = document.getElementById('dob')?.value || '';
-    const contact = document.getElementById('contact')?.value || '';
-    const address = document.getElementById('address')?.value || '';
+    const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
 
     fetch('php/profile.php', {
         method: 'POST',
@@ -87,21 +79,18 @@ function updateProfile() {
         body: JSON.stringify({
             token: token,
             action: 'update',
-            age: age,
-            dob: dob,
-            contact: contact,
-            address: address
+            username: storedUser.username,
+            email: storedUser.email,
+            age: document.getElementById('age').value,
+            dob: document.getElementById('dob').value,
+            contact: document.getElementById('contact').value,
+            address: document.getElementById('address').value
         })
     })
     .then(response => response.json())
     .then(data => {
         console.log('Update response:', data);
-
-        if (data.status === 'success') {
-            alert(data.message || 'Profile updated successfully.');
-        } else {
-            alert(data.message || 'Failed to update profile.');
-        }
+        alert(data.message || 'Profile updated.');
     })
     .catch(error => {
         console.error('Update profile error:', error);
