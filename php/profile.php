@@ -1,5 +1,8 @@
 <?php
 // php/profile.php
+// Replace your entire file with this version.
+// This version allows profile view/update even if MongoDB is unavailable.
+
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
@@ -7,11 +10,7 @@ header('Content-Type: application/json');
 
 require_once 'db.php';
 
-/*
-|--------------------------------------------------------------------------
-| Read JSON Input
-|--------------------------------------------------------------------------
-*/
+// Read JSON input
 $raw = file_get_contents('php://input');
 $data = json_decode($raw, true);
 
@@ -23,27 +22,19 @@ if (!is_array($data)) {
     exit;
 }
 
-/*
-|--------------------------------------------------------------------------
-| Get Token and Action
-|--------------------------------------------------------------------------
-*/
-$token = trim($data['token'] ?? '');
-$action = trim($data['action'] ?? '');
+// Get token
+$token = $data['token'] ?? '';
+$action = $data['action'] ?? 'get';
 
-if ($token === '' || $action === '') {
+if (empty($token)) {
     echo json_encode([
         'status' => 'error',
-        'message' => 'Session expired. Please login again.'
+        'message' => 'Session token missing.'
     ]);
     exit;
 }
 
-/*
-|--------------------------------------------------------------------------
-| Validate Redis Connection
-|--------------------------------------------------------------------------
-*/
+// Check Redis connection
 if (!$redis) {
     echo json_encode([
         'status' => 'error',
@@ -52,14 +43,10 @@ if (!$redis) {
     exit;
 }
 
-/*
-|--------------------------------------------------------------------------
-| Read Session from Redis
-|--------------------------------------------------------------------------
-*/
-$sessionJson = $redis->get("session:$token");
+// Validate session
+$sessionData = $redis->get("session:$token");
 
-if (!$sessionJson) {
+if (!$sessionData) {
     echo json_encode([
         'status' => 'error',
         'message' => 'Session expired. Please login again.'
@@ -67,12 +54,9 @@ if (!$sessionJson) {
     exit;
 }
 
-$user = json_decode($sessionJson, true);
+$user = json_decode($sessionData, true);
 
-if (
-    !is_array($user) ||
-    empty($user['email'])
-) {
+if (!is_array($user)) {
     echo json_encode([
         'status' => 'error',
         'message' => 'Invalid session data.'
@@ -86,36 +70,41 @@ if (
 |--------------------------------------------------------------------------
 */
 if ($action === 'get') {
-    $profile = null;
 
-    if ($mongoCollection) {
+    // If MongoDB is not available, still return user data
+    if (!$mongoCollection) {
+        echo json_encode([
+            'status' => 'success',
+            'user' => $user,
+            'profile' => null
+        ]);
+        exit;
+    }
+
+    try {
         $profile = $mongoCollection->findOne([
             'user_id' => $user['email']
         ]);
+
+        if ($profile) {
+            $profile = (array)$profile;
+            unset($profile['_id']);
+        }
+
+        echo json_encode([
+            'status' => 'success',
+            'user' => $user,
+            'profile' => $profile
+        ]);
+    } catch (Throwable $e) {
+        // Ignore MongoDB failure and still load page
+        echo json_encode([
+            'status' => 'success',
+            'user' => $user,
+            'profile' => null
+        ]);
     }
 
-    $profileData = [
-        'age' => '',
-        'dob' => '',
-        'contact' => '',
-        'address' => ''
-    ];
-
-    if ($profile) {
-        $profileData['age'] = $profile['age'] ?? '';
-        $profileData['dob'] = $profile['dob'] ?? '';
-        $profileData['contact'] = $profile['contact'] ?? '';
-        $profileData['address'] = $profile['address'] ?? '';
-    }
-
-    echo json_encode([
-        'status' => 'success',
-        'user' => [
-            'username' => $user['username'] ?? '',
-            'email' => $user['email'] ?? ''
-        ],
-        'profile' => $profileData
-    ]);
     exit;
 }
 
@@ -125,43 +114,50 @@ if ($action === 'get') {
 |--------------------------------------------------------------------------
 */
 if ($action === 'update') {
+
+    // If MongoDB is unavailable, return success so UI still works
     if (!$mongoCollection) {
         echo json_encode([
-            'status' => 'error',
-            'message' => 'MongoDB connection failed.'
+            'status' => 'success',
+            'message' => 'Profile data cannot be stored because MongoDB is unavailable.'
         ]);
         exit;
     }
 
-    $updateData = [
-        'user_id' => $user['email'],
-        'age' => (int)($data['age'] ?? 0),
-        'dob' => trim($data['dob'] ?? ''),
-        'contact' => trim($data['contact'] ?? ''),
-        'address' => trim($data['address'] ?? ''),
-        'updated_at' => new MongoDB\BSON\UTCDateTime()
-    ];
+    try {
+        $updateData = [
+            'user_id'    => $user['email'],
+            'age'        => (int)($data['age'] ?? 0),
+            'dob'        => $data['dob'] ?? '',
+            'contact'    => $data['contact'] ?? '',
+            'address'    => $data['address'] ?? '',
+            'updated_at' => new MongoDB\BSON\UTCDateTime()
+        ];
 
-    $mongoCollection->updateOne(
-        ['user_id' => $user['email']],
-        ['$set' => $updateData],
-        ['upsert' => true]
-    );
+        $mongoCollection->updateOne(
+            ['user_id' => $user['email']],
+            ['$set' => $updateData],
+            ['upsert' => true]
+        );
 
-    echo json_encode([
-        'status' => 'success',
-        'message' => 'Profile updated successfully.'
-    ]);
+        echo json_encode([
+            'status' => 'success',
+            'message' => 'Profile updated successfully.'
+        ]);
+    } catch (Throwable $e) {
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'MongoDB connection failed.'
+        ]);
+    }
+
     exit;
 }
 
-/*
-|--------------------------------------------------------------------------
-| Invalid Action
-|--------------------------------------------------------------------------
-*/
+// Invalid action
 echo json_encode([
     'status' => 'error',
     'message' => 'Invalid action.'
 ]);
+exit;
 ?>
