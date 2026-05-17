@@ -47,26 +47,29 @@ try {
     if (class_exists('MongoDB\\Client') &&
         class_exists('MongoDB\\Driver\\Manager')) {
 
-        // Get Railway MongoDB URI
+        // Use Railway MongoDB connection string
         $mongoUri = getenv('MONGO_PUBLIC_URL') ?: getenv('MONGO_URL');
 
         if (!$mongoUri) {
-            throw new Exception('MONGO_PUBLIC_URL or MONGO_URL not found.');
+            throw new Exception('MongoDB URI not found.');
         }
 
-        // Force database name to "guvi"
-        $mongoClient = new MongoDB\Client($mongoUri);
+        // Create client with retryWrites disabled (important for Railway)
+        $mongoClient = new MongoDB\Client($mongoUri, [
+            'retryWrites' => false
+        ]);
 
+        // Always use guvi database
         $mongoDb = $mongoClient->selectDatabase('guvi');
+
+        // Use profiles collection
         $mongoCollection = $mongoDb->selectCollection('profiles');
 
         // Test connection
         $mongoCollection->countDocuments([], ['limit' => 1]);
     }
 } catch (Throwable $e) {
-    // Disable logging to file (permission issue on Railway)
     error_log('MongoDB Error: ' . $e->getMessage());
-
     $mongoCollection = null;
 }
 /*
