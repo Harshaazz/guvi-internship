@@ -1,6 +1,6 @@
 <?php
 // php/db.php
-// Replace your entire db.php with this code.
+// Final fixed version with safe MongoDB handling.
 
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
@@ -44,16 +44,22 @@ if ($mysqlHost && $mysqlDatabase && $mysqlUser) {
 $mongoCollection = null;
 
 try {
-    $mongoHost = getenv('MONGOHOST') ?: 'mongodb';
-    $mongoPort = getenv('MONGOPORT') ?: 27017;
-    $mongoDatabase = getenv('MONGODB_DATABASE') ?: 'guvi';
+    // Only attempt MongoDB connection if extension is installed
+    if (class_exists('MongoDB\\Client') &&
+        class_exists('MongoDB\\Driver\\Manager')) {
 
-    $mongoUri = "mongodb://{$mongoHost}:{$mongoPort}";
-    $mongoClient = new MongoDB\Client($mongoUri);
+        $mongoHost = getenv('MONGOHOST') ?: 'mongodb';
+        $mongoPort = getenv('MONGOPORT') ?: 27017;
+        $mongoDatabase = getenv('MONGODB_DATABASE') ?: 'guvi';
 
-    $db = $mongoClient->$mongoDatabase;
-    $mongoCollection = $db->profiles;
-} catch (Exception $e) {
+        $mongoUri = "mongodb://{$mongoHost}:{$mongoPort}";
+
+        $mongoClient = new MongoDB\Client($mongoUri);
+        $mongoDb = $mongoClient->$mongoDatabase;
+        $mongoCollection = $mongoDb->profiles;
+    }
+} catch (Throwable $e) {
+    // Ignore MongoDB errors so login still works
     $mongoCollection = null;
 }
 
@@ -81,9 +87,9 @@ try {
 
     $redis = new PredisClient($config);
 
-    // Test the connection
+    // Test connection
     $redis->ping();
-} catch (Exception $e) {
+} catch (Throwable $e) {
     $redis = null;
 }
 ?>
