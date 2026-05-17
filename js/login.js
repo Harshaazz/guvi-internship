@@ -1,7 +1,7 @@
 // js/login.js
 
 $(document).ready(function () {
-    $('#loginForm').on('submit', function (e) {
+    $('#loginBtn').on('click', function (e) {
         e.preventDefault();
 
         const email = $('#email').val().trim();
@@ -16,7 +16,7 @@ $(document).ready(function () {
 
         $.ajax({
             url: 'php/login.php',
-            method: 'POST',
+            type: 'POST',
             contentType: 'application/json',
             dataType: 'json',
             data: JSON.stringify({
@@ -28,10 +28,10 @@ $(document).ready(function () {
                 console.log('Login response:', res);
 
                 if (res.status === 'success') {
-                    // Save ONLY one token
+                    // Save token
                     localStorage.setItem('token', res.token);
 
-                    // Save user info
+                    // Save user data
                     if (res.user) {
                         localStorage.setItem(
                             'user',
@@ -39,18 +39,20 @@ $(document).ready(function () {
                         );
                     }
 
-                    // Remove old token key if present
+                    // Remove old key
                     localStorage.removeItem('session_token');
 
-                    // Force redirect
-                    window.location.replace('profile.html');
+                    // Redirect to profile page
+                    setTimeout(function () {
+                        window.location.href = 'profile.html';
+                    }, 100);
                 } else {
                     alert(res.message || 'Login failed.');
                 }
             },
 
             error: function (xhr) {
-                console.log('Server response:', xhr.responseText);
+                console.log(xhr.responseText);
                 alert('Login failed. Check console for details.');
             },
 
