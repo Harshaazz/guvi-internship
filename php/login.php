@@ -1,5 +1,6 @@
 <?php
 session_start();
+
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
@@ -7,15 +8,10 @@ header('Content-Type: application/json');
 
 require_once 'db.php';
 
-/*
-|--------------------------------------------------------------------------
-| Read JSON Input Safely
-|--------------------------------------------------------------------------
-*/
+// Read JSON input
 $raw = file_get_contents('php://input');
 $data = json_decode($raw, true);
 
-// If no JSON was sent (e.g., opening login.php directly), use empty array
 if (!is_array($data)) {
     $data = [];
 }
@@ -23,7 +19,6 @@ if (!is_array($data)) {
 $email = trim($data['email'] ?? '');
 $password = $data['password'] ?? '';
 
-// Only require email/password for actual login requests
 if ($email === '' || $password === '') {
     echo json_encode([
         'status' => 'error',
@@ -32,28 +27,81 @@ if ($email === '' || $password === '') {
     exit;
 }
 
+// Check MySQL connection
+if (!$conn) {
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'Database connection failed.'
+    ]);
+    exit;
+}
 
-/*
-|--------------------------------------------------------------------------
-| Generate ONE token only
-|--------------------------------------------------------------------------
-*/
+// Fetch user from MySQL
+$stmt = $conn->prepare("
+    SELECT username, email, password
+    FROM users
+    WHERE email = ?
+    LIMIT 1
+");
+
+if (!$stmt) {
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'Failed to prepare query.'
+    ]);
+    exit;
+}
+
+$stmt->bind_param("s", $email);
+$stmt->execute();
+
+$result = $stmt->get_result();
+$user = $result->fetch_assoc();
+
+if (!$user) {
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'User not found.'
+    ]);
+    exit;
+}
+
+// Verify password
+if (!password_verify($password, $user['password'])) {
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'Incorrect password.'
+    ]);
+    exit;
+}
+
+// Generate token
 $token = bin2hex(random_bytes(32));
 
-/*
-|--------------------------------------------------------------------------
-| Store session using PHP Session
-|--------------------------------------------------------------------------
-*/
-
+// Save PHP session
+$_SESSION['token'] = $token;
 $_SESSION['user'] = [
     'username' => $user['username'],
     'email'    => $user['email']
 ];
 
-// Optional: also store token if your frontend still uses it
-$_SESSION['token'] = $token;
+// Save to Redis (optional)
+if ($redis) {
+    try {
+        $redis->setex(
+            "session:$token",
+            86400,
+            json_encode([
+                'username' => $user['username'],
+                'email'    => $user['email']
+            ])
+        );
+    } catch (Throwable $e) {
+        // Ignore Redis errors
+    }
+}
 
+// Return success
 echo json_encode([
     'status' => 'success',
     'message' => 'Login successful.',
