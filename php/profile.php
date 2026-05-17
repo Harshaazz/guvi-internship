@@ -41,9 +41,20 @@ if (empty($token)) {
 | Temporary User (replace with real token lookup later)
 |--------------------------------------------------------------------------
 */
+$username = $data['username'] ?? ($_GET['username'] ?? '');
+$email    = $data['email'] ?? ($_GET['email'] ?? '');
+
+if (empty($email)) {
+    echo json_encode([
+        'status'  => 'error',
+        'message' => 'User email missing.'
+    ]);
+    exit;
+}
+
 $user = [
-    'username' => 'hello',
-    'email'    => 'hello@gmail.com'
+    'username' => $username,
+    'email'    => $email
 ];
 
 /*
@@ -160,4 +171,4 @@ echo json_encode([
     'message' => 'Invalid action.'
 ]);
 exit;
-?>
+?>  
