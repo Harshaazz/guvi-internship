@@ -27,9 +27,12 @@ function loadProfile() {
         },
         body: JSON.stringify({
             token: token,
-            action: 'get',
-            username: storedUser.username,
-            email: storedUser.email
+            action: 'update',
+            user: localStorage.getItem('user'),
+            age: document.getElementById('age').value,
+            dob: document.getElementById('dob').value,
+            contact: document.getElementById('contact').value,
+            address: document.getElementById('address').value
         })
     })
     .then(response => response.json())

@@ -117,10 +117,24 @@ if ($action === 'get') {
 */
 if ($action === 'update') {
 
-    // If MongoDB is unavailable, return success so UI still works
+    // Get user from localStorage data
+    $storedUser = json_decode($data['user'] ?? '{}', true);
+
+    if (!is_array($storedUser) || empty($storedUser['email'])) {
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'User email missing.'
+        ]);
+        exit;
+    }
+
+    $email = $storedUser['email'];
+    $username = $storedUser['username'] ?? '';
+
+    // If MongoDB is unavailable
     if (!$mongoCollection) {
         echo json_encode([
-            'status'  => 'success',
+            'status' => 'success',
             'message' => 'Profile data cannot be stored because MongoDB is unavailable.'
         ]);
         exit;
@@ -128,39 +142,36 @@ if ($action === 'update') {
 
     try {
         $updateData = [
-            'user_id'    => $user['email'],
+            'email'      => $email,
+            'username'   => $username,
             'age'        => (int)($data['age'] ?? 0),
             'dob'        => $data['dob'] ?? '',
             'contact'    => $data['contact'] ?? '',
             'address'    => $data['address'] ?? '',
-            'updated_at' => new MongoDB\BSON\UTCDateTime()
+            'updated_at' => date('Y-m-d H:i:s')
         ];
 
         $result = $mongoCollection->updateOne(
-            ['user_id' => $user['email']],
+            ['email' => $email],   // IMPORTANT: match by email
             ['$set' => $updateData],
             ['upsert' => true]
         );
 
         echo json_encode([
-            'status'      => 'success',
-            'message'     => 'Profile updated successfully.',
-            'matched'     => $result->getMatchedCount(),
-            'modified'    => $result->getModifiedCount(),
-            'upserted_id' => $result->getUpsertedId()
-                ? (string)$result->getUpsertedId()
-                : null
+            'status' => 'success',
+            'message' => 'Profile updated successfully.',
+            'matched' => $result->getMatchedCount(),
+            'modified' => $result->getModifiedCount()
         ]);
     } catch (Throwable $e) {
         echo json_encode([
-            'status'  => 'error',
+            'status' => 'error',
             'message' => $e->getMessage()
         ]);
     }
 
     exit;
 }
-
 /*
 |--------------------------------------------------------------------------
 | Invalid Action
