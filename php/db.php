@@ -80,25 +80,28 @@ try {
 $redis = null;
 
 try {
-    $redisHost = getenv('REDISHOST') ?: 'redis';
-    $redisPort = getenv('REDISPORT') ?: 6379;
-    $redisPassword = getenv('REDISPASSWORD') ?: null;
+    // Use Railway public/internal variables
+    $redisHost = getenv('REDISHOST') ?: getenv('REDIS_HOST');
+    $redisPort = getenv('REDISPORT') ?: getenv('REDIS_PORT') ?: 6379;
+    $redisPassword = getenv('REDISPASSWORD') ?: getenv('REDIS_PASSWORD');
 
-    $config = [
-        'scheme' => 'tcp',
-        'host'   => $redisHost,
-        'port'   => (int)$redisPort,
-    ];
+    if ($redisHost) {
+        $config = [
+            'scheme' => 'tcp',
+            'host'   => $redisHost,
+            'port'   => (int)$redisPort,
+        ];
 
-    if (!empty($redisPassword)) {
-        $config['password'] = $redisPassword;
+        if (!empty($redisPassword)) {
+            $config['password'] = $redisPassword;
+        }
+
+        $redis = new PredisClient($config);
+
+        // Test connection
+        $redis->ping();
     }
-
-    $redis = new PredisClient($config);
-
-    // Test connection
-    $redis->ping();
 } catch (Throwable $e) {
+    error_log('Redis Error: ' . $e->getMessage());
     $redis = null;
 }
-?>
