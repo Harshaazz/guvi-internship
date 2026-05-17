@@ -1,26 +1,19 @@
 // js/login.js
-// Fix for: Cannot read properties of undefined (reading 'trim')
 
 $(document).ready(function () {
     $('#loginForm').on('submit', function (e) {
         e.preventDefault();
 
-        // Use name selectors (works even if id attributes are missing)
-        const email = $('input[name="email"]').val();
-        const password = $('input[name="password"]').val();
+        const email = $('#email').val().trim();
+        const password = $('#password').val();
 
-        // Safe trim
-        const cleanEmail = email ? email.trim() : '';
-        const cleanPassword = password ? password : '';
-
-        if (cleanEmail === '' || cleanPassword === '') {
-            alert('Email and password are required.');
+        if (!email || !password) {
+            alert('Please enter email and password.');
             return;
         }
 
-        $('#loginBtn')
-            .prop('disabled', true)
-            .text('Logging in...');
+        const $btn = $('#loginBtn');
+        $btn.prop('disabled', true).text('Logging in...');
 
         $.ajax({
             url: 'php/login.php',
@@ -28,42 +21,33 @@ $(document).ready(function () {
             contentType: 'application/json',
             dataType: 'json',
             data: JSON.stringify({
-                email: cleanEmail,
-                password: cleanPassword
+                email: email,
+                password: password
             }),
 
             success: function (response) {
-                console.log('Login Response:', response);
+                console.log('Login response:', response);
 
-                if (response.status === 'success' && response.token) {
-                    // Store token
+                if (response.status === 'success') {
+                    // Save session token in localStorage
                     localStorage.setItem('token', response.token);
                     localStorage.setItem('session_token', response.token);
-
-                    // Store user info
-                    if (response.user) {
-                        localStorage.setItem(
-                            'user',
-                            JSON.stringify(response.user)
-                        );
-                    }
+                    localStorage.setItem('user', JSON.stringify(response.user));
 
                     // Redirect to profile page
                     window.location.href = 'profile.html';
                 } else {
-                    alert(response.message || 'Login failed.');
+                    alert(response.message || 'Login failed. Please try again.');
                 }
             },
 
-            error: function (xhr) {
-                console.log('Server Response:', xhr.responseText);
-                alert('Login failed. Please try again.');
+            error: function (xhr, status, error) {
+                console.error('AJAX Error:', xhr.responseText);
+                alert('Server error occurred during login.');
             },
 
             complete: function () {
-                $('#loginBtn')
-                    .prop('disabled', false)
-                    .text('Login');
+                $btn.prop('disabled', false).text('Login');
             }
         });
     });
