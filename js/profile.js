@@ -1,77 +1,87 @@
-$(document).ready(function () {
-    const token = localStorage.getItem("session_token");
+document.addEventListener('DOMContentLoaded', function () {
+    loadProfile();
 
-    // If user is not logged in, redirect to login page
+    document.getElementById('profileForm').addEventListener('submit', function (e) {
+        e.preventDefault();
+        updateProfile();
+    });
+});
+
+function loadProfile() {
+    const token = localStorage.getItem('token');
+
     if (!token) {
-        window.location.href = "login.html";
+        alert('Please login first.');
+        window.location.href = 'login.html';
         return;
     }
 
-    // Load profile data
-    $.ajax({
-        url: "php/profile.php",
-        type: "POST",
-        contentType: "application/json",
-        data: JSON.stringify({
-            action: "get",
-            token: token
-        }),
-        success: function (response) {
-            if (response.status === "success") {
-                // Fill read-only fields
-                $("#username").val(response.user.username);
-                $("#email").val(response.user.email);
-
-                // Fill editable profile fields
-                if (response.profile) {
-                    $("#age").val(response.profile.age || "");
-                    $("#dob").val(response.profile.dob || "");
-                    $("#contact").val(response.profile.contact || "");
-                    $("#address").val(response.profile.address || "");
-                }
-            } else {
-                alert(response.message);
-                localStorage.removeItem("session_token");
-                window.location.href = "login.html";
-            }
+    fetch('php/profile.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
         },
-        error: function () {
-            alert("Failed to load profile.");
+        body: JSON.stringify({
+            token: token,
+            action: 'get'
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log('Profile response:', data);
+
+        if (data.status !== 'success') {
+            alert(data.message || 'Failed to load profile.');
+            return;
         }
-    });
 
-    // Update profile
-    $("#profileForm").on("submit", function (e) {
-        e.preventDefault();
+        // User data
+        document.getElementById('username').value = data.user?.username || '';
+        document.getElementById('email').value = data.user?.email || '';
 
-        $.ajax({
-            url: "php/profile.php",
-            type: "POST",
-            contentType: "application/json",
-            data: JSON.stringify({
-                action: "update",
-                token: token,
-                age: $("#age").val(),
-                dob: $("#dob").val(),
-                contact: $("#contact").val(),
-                address: $("#address").val()
-            }),
-            success: function (response) {
-                if (response.status === "success") {
-                    alert("Profile updated successfully!");
-                } else {
-                    alert(response.message);
-                }
-            },
-            error: function () {
-                alert("Failed to update profile.");
-            }
-        });
+        // Profile data
+        if (data.profile) {
+            document.getElementById('age').value = data.profile.age || '';
+            document.getElementById('dob').value = data.profile.dob || '';
+            document.getElementById('contact').value = data.profile.contact || '';
+            document.getElementById('address').value = data.profile.address || '';
+        }
+    })
+    .catch(error => {
+        console.error('Load profile error:', error);
+        alert('Failed to load profile.');
     });
+}
 
-    // Logout
-    $("#logoutBtn").on("click", function () {
-        localStorage.removeItem("session_token");
-        window.location.href = "login.html";
+function updateProfile() {
+    const token = localStorage.getItem('token');
+
+    fetch('php/profile.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            token: token,
+            action: 'update',
+            age: document.getElementById('age').value,
+            dob: document.getElementById('dob').value,
+            contact: document.getElementById('contact').value,
+            address: document.getElementById('address').value
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log('Update response:', data);
+        alert(data.message || 'Profile updated.');
+    })
+    .catch(error => {
+        console.error('Update profile error:', error);
+        alert('Failed to update profile.');
     });
-});
+}
+
+function logout() {
+    localStorage.removeItem('token');
+    window.location.href = 'login.html';
+}
