@@ -36,6 +36,8 @@ if ($mysqlHost && $mysqlDatabase && $mysqlUser) {
     }
 }
 
+// REPLACE ONLY THE MONGODB SECTION IN php/db.php WITH THIS EXACT CODE
+
 /*
 |--------------------------------------------------------------------------
 | MongoDB Connection
@@ -44,26 +46,49 @@ if ($mysqlHost && $mysqlDatabase && $mysqlUser) {
 $mongoCollection = null;
 
 try {
+    // Ensure MongoDB library and PHP extension are available
     if (class_exists('MongoDB\\Client') &&
         class_exists('MongoDB\\Driver\\Manager')) {
 
-        // Prefer public URL first
-        $mongoUri = getenv('MONGO_PUBLIC_URL') ?: getenv('MONGO_URL');
+        // Use Railway's public URL first (most reliable)
+        $mongoUri = getenv('MONGO_PUBLIC_URL');
 
+        // Fallback to internal URL if public URL is not set
         if (!$mongoUri) {
-            throw new Exception('MongoDB connection string not found.');
+            $mongoUri = getenv('MONGO_URL');
         }
 
-        $mongoDatabase = getenv('MONGODB_DATABASE') ?: 'guvi';
+        // Stop if no URI is found
+        if (!$mongoUri) {
+            throw new Exception('MongoDB URI not found in environment variables.');
+        }
 
+        // Extract database name from URI if possible
+        $parsed = parse_url($mongoUri);
+        $dbName = 'guvi';
+
+        if (!empty($parsed['path']) && $parsed['path'] !== '/') {
+            $dbName = ltrim($parsed['path'], '/');
+        }
+
+        // Create MongoDB client
         $mongoClient = new MongoDB\Client($mongoUri);
-        $mongoDb = $mongoClient->selectDatabase($mongoDatabase);
+
+        // Select database and collection
+        $mongoDb = $mongoClient->selectDatabase($dbName);
         $mongoCollection = $mongoDb->selectCollection('profiles');
 
         // Test connection
         $mongoCollection->countDocuments([], ['limit' => 1]);
     }
 } catch (Throwable $e) {
+    // Optional: save the error for debugging
+    file_put_contents(
+        __DIR__ . '/mongo_error.log',
+        date('Y-m-d H:i:s') . ' - ' . $e->getMessage() . PHP_EOL,
+        FILE_APPEND
+    );
+
     $mongoCollection = null;
 }
 /*
