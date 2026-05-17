@@ -44,27 +44,19 @@ if ($mysqlHost && $mysqlDatabase && $mysqlUser) {
 $mongoCollection = null;
 
 try {
-    // Only attempt MongoDB connection if extension and library are installed
     if (class_exists('MongoDB\\Client') &&
         class_exists('MongoDB\\Driver\\Manager')) {
 
-        // Use Railway full connection string
-        $mongoUri = getenv('MONGO_URL') ?: getenv('MONGO_PUBLIC_URL');
+        // Prefer public URL first
+        $mongoUri = getenv('MONGO_PUBLIC_URL') ?: getenv('MONGO_URL');
 
-        // Fallback for local development
         if (!$mongoUri) {
-            $mongoHost = getenv('MONGOHOST') ?: 'localhost';
-            $mongoPort = getenv('MONGOPORT') ?: 27017;
-            $mongoUri = "mongodb://{$mongoHost}:{$mongoPort}";
+            throw new Exception('MongoDB connection string not found.');
         }
 
-        // Database name to store your data
         $mongoDatabase = getenv('MONGODB_DATABASE') ?: 'guvi';
 
-        // Connect to MongoDB
         $mongoClient = new MongoDB\Client($mongoUri);
-
-        // Select database and collection
         $mongoDb = $mongoClient->selectDatabase($mongoDatabase);
         $mongoCollection = $mongoDb->selectCollection('profiles');
 
@@ -72,10 +64,8 @@ try {
         $mongoCollection->countDocuments([], ['limit' => 1]);
     }
 } catch (Throwable $e) {
-    // Ignore MongoDB errors so login still works
     $mongoCollection = null;
 }
-
 /*
 |--------------------------------------------------------------------------
 | Redis Connection
