@@ -89,44 +89,49 @@ if ($action === 'get') {
 
 /*
 |--------------------------------------------------------------------------
-| UPDATE PROFILE
+| GET PROFILE
 |--------------------------------------------------------------------------
 */
-if ($action === 'update') {
+if ($action === 'get') {
 
-    // If MongoDB is unavailable, return success so UI still works
+    // If MongoDB is unavailable, still return user data
     if (!$mongoCollection) {
         echo json_encode([
             'status'  => 'success',
-            'message' => 'Profile data cannot be stored because MongoDB is unavailable.'
+            'user'    => $user,
+            'profile' => null
         ]);
         exit;
     }
 
     try {
-        $updateData = [
-            'user_id'    => $user['email'],
-            'age'        => (int)($data['age'] ?? 0),
-            'dob'        => $data['dob'] ?? '',
-            'contact'    => $data['contact'] ?? '',
-            'address'    => $data['address'] ?? '',
-            'updated_at' => new MongoDB\BSON\UTCDateTime()
-        ];
+        // Fetch profile using user's email as user_id
+        $profile = $mongoCollection->findOne([
+            'user_id' => $user['email']
+        ]);
 
-        $result = $mongoCollection->updateOne(
-            ['user_id' => $user['email']],
-            ['$set' => $updateData],
-            ['upsert' => true]
-        );
+        // Convert MongoDB document to array
+        if ($profile) {
+            $profile = (array)$profile;
+
+            // Remove MongoDB internal ID
+            unset($profile['_id']);
+
+            // Ensure all expected fields exist
+            $profile = [
+                'age'     => $profile['age'] ?? '',
+                'dob'     => $profile['dob'] ?? '',
+                'contact' => $profile['contact'] ?? '',
+                'address' => $profile['address'] ?? ''
+            ];
+        } else {
+            $profile = null;
+        }
 
         echo json_encode([
-            'status'      => 'success',
-            'message'     => 'Profile updated successfully.',
-            'matched'     => $result->getMatchedCount(),
-            'modified'    => $result->getModifiedCount(),
-            'upserted_id' => $result->getUpsertedId()
-                ? (string)$result->getUpsertedId()
-                : null
+            'status'  => 'success',
+            'user'    => $user,
+            'profile' => $profile
         ]);
     } catch (Throwable $e) {
         echo json_encode([
