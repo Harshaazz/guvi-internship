@@ -74,41 +74,45 @@ try {
 }
 /*
 |--------------------------------------------------------------------------
-| Redis Connection (Railway Compatible)
+| Redis Connection (Optional - Do NOT block profile update)
 |--------------------------------------------------------------------------
 */
 $redis = null;
 
 try {
-    // Use Railway's REDIS_URL first (recommended)
+    // Try Railway URL first
     $redisUrl = getenv('REDIS_URL') ?: getenv('REDIS_PUBLIC_URL');
 
     if ($redisUrl) {
-        // Connect using full Redis URL
         $redis = new PredisClient($redisUrl);
     } else {
-        // Fallback to individual variables
-        $redisHost = getenv('REDISHOST') ?: getenv('REDIS_HOST') ?: 'redis';
+        $redisHost = getenv('REDISHOST') ?: getenv('REDIS_HOST');
         $redisPort = getenv('REDISPORT') ?: getenv('REDIS_PORT') ?: 6379;
-        $redisPassword = getenv('REDISPASSWORD') ?: getenv('REDIS_PASSWORD') ?: null;
+        $redisPassword = getenv('REDISPASSWORD') ?: getenv('REDIS_PASSWORD');
 
-        $config = [
-            'scheme' => 'tcp',
-            'host'   => $redisHost,
-            'port'   => (int)$redisPort,
-        ];
+        if ($redisHost) {
+            $config = [
+                'scheme' => 'tcp',
+                'host'   => $redisHost,
+                'port'   => (int)$redisPort,
+            ];
 
-        if (!empty($redisPassword)) {
-            $config['password'] = $redisPassword;
+            if (!empty($redisPassword)) {
+                $config['password'] = $redisPassword;
+            }
+
+            $redis = new PredisClient($config);
         }
-
-        $redis = new PredisClient($config);
     }
 
-    // Test connection
-    $redis->ping();
+    // Test only if Redis object was created
+    if ($redis !== null) {
+        $redis->ping();
+    }
 
 } catch (Throwable $e) {
+    // IMPORTANT:
+    // Redis is optional. If it fails, continue without Redis.
     error_log('Redis Error: ' . $e->getMessage());
     $redis = null;
 }
