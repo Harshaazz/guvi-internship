@@ -69,8 +69,9 @@ try {
         $mongoCollection->countDocuments([], ['limit' => 1]);
     }
 } catch (Throwable $e) {
-    error_log('MongoDB Error: ' . $e->getMessage());
-    $mongoCollection = null;
+    die(json_encode([
+        "mongo_error" => $e->getMessage()
+    ], JSON_PRETTY_PRINT));
 }
 /*
 |--------------------------------------------------------------------------
