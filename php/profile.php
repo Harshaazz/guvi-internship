@@ -9,7 +9,7 @@ require_once 'db.php';
 
 /*
 |--------------------------------------------------------------------------
-| Read JSON Input
+| Read JSON Input Safely
 |--------------------------------------------------------------------------
 */
 $raw = file_get_contents('php://input');
@@ -24,8 +24,8 @@ if (!is_array($data)) {
 | Get Token and Action
 |--------------------------------------------------------------------------
 */
-$token  = $data['token'] ?? '';
-$action = $data['action'] ?? 'get';
+$token  = $data['token'] ?? ($_GET['token'] ?? '');
+$action = $data['action'] ?? ($_GET['action'] ?? 'get');
 
 if (empty($token)) {
     echo json_encode([
@@ -37,24 +37,40 @@ if (empty($token)) {
 
 /*
 |--------------------------------------------------------------------------
-| Get User From localStorage (sent from JavaScript)
+| Get User From localStorage Data
+|--------------------------------------------------------------------------
+| login.js stores:
+| localStorage.setItem('user', JSON.stringify(response.user));
 |--------------------------------------------------------------------------
 */
-$storedUser = json_decode($data['user'] ?? '{}', true);
+$userData = $data['user'] ?? ($_GET['user'] ?? []);
 
-if (!is_array($storedUser)) {
-    $storedUser = [];
+// If user is sent as a JSON string, decode it
+if (is_string($userData)) {
+    $decoded = json_decode($userData, true);
+    if (is_array($decoded)) {
+        $userData = $decoded;
+    }
 }
 
-$email = $storedUser['email'] ?? '';
-$username = $storedUser['username'] ?? '';
+// Ensure array
+if (!is_array($userData)) {
+    $userData = [];
+}
+
+// Extract username and email
+$username = $userData['username'] ?? '';
+$email    = $userData['email'] ?? '';
 
 if (empty($email)) {
-    // Fallback to token-based placeholder if user data wasn't sent
-    $email = 'hello@gmail.com';
-    $username = 'hello';
+    echo json_encode([
+        'status'  => 'error',
+        'message' => 'User email missing.'
+    ]);
+    exit;
 }
 
+// Build user object
 $user = [
     'username' => $username,
     'email'    => $email
@@ -67,6 +83,7 @@ $user = [
 */
 if ($action === 'get') {
 
+    // If MongoDB is unavailable, still return user data
     if (!$mongoCollection) {
         echo json_encode([
             'status'  => 'success',
@@ -77,6 +94,7 @@ if ($action === 'get') {
     }
 
     try {
+        // Find profile by email
         $profile = $mongoCollection->findOne([
             'email' => $email
         ]);
@@ -85,6 +103,7 @@ if ($action === 'get') {
             $profile = (array)$profile;
             unset($profile['_id']);
 
+            // Return only form fields
             $profile = [
                 'age'     => $profile['age'] ?? '',
                 'dob'     => $profile['dob'] ?? '',
@@ -102,9 +121,8 @@ if ($action === 'get') {
         ]);
     } catch (Throwable $e) {
         echo json_encode([
-            'status'  => 'success',
-            'user'    => $user,
-            'profile' => null
+            'status'  => 'error',
+            'message' => $e->getMessage()
         ]);
     }
 
@@ -118,6 +136,7 @@ if ($action === 'get') {
 */
 if ($action === 'update') {
 
+    // If MongoDB is unavailable
     if (!$mongoCollection) {
         echo json_encode([
             'status'  => 'success',
@@ -137,15 +156,18 @@ if ($action === 'update') {
             'updated_at' => date('Y-m-d H:i:s')
         ];
 
-        $mongoCollection->updateOne(
+        // Update existing profile or insert new one
+        $result = $mongoCollection->updateOne(
             ['email' => $email],
             ['$set' => $updateData],
             ['upsert' => true]
         );
 
         echo json_encode([
-            'status'  => 'success',
-            'message' => 'Profile updated successfully.'
+            'status'   => 'success',
+            'message'  => 'Profile updated successfully.',
+            'matched'  => $result->getMatchedCount(),
+            'modified' => $result->getModifiedCount()
         ]);
     } catch (Throwable $e) {
         echo json_encode([

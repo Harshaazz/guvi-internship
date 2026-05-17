@@ -1,18 +1,15 @@
 document.addEventListener('DOMContentLoaded', function () {
     loadProfile();
 
-    const form = document.getElementById('profileForm');
-    if (form) {
-        form.addEventListener('submit', function (e) {
-            e.preventDefault();
-            updateProfile();
-        });
-    }
+    document.getElementById('profileForm').addEventListener('submit', function (e) {
+        e.preventDefault();
+        updateProfile();
+    });
 });
 
 function loadProfile() {
     const token = localStorage.getItem('token');
-    const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
 
     if (!token) {
         alert('Please login first.');
@@ -27,12 +24,8 @@ function loadProfile() {
         },
         body: JSON.stringify({
             token: token,
-            user: localStorage.getItem('user'),
-            action: 'update',
-            age: document.getElementById('age').value,
-            dob: document.getElementById('dob').value,
-            contact: document.getElementById('contact').value,
-            address: document.getElementById('address').value
+            user: user,
+            action: 'get'
         })
     })
     .then(response => response.json())
@@ -44,24 +37,16 @@ function loadProfile() {
             return;
         }
 
-        // User data
-        const username = document.getElementById('username');
-        const email = document.getElementById('email');
+        // Fill readonly fields
+        document.getElementById('username').value = data.user?.username || '';
+        document.getElementById('email').value = data.user?.email || '';
 
-        if (username) username.value = data.user?.username || '';
-        if (email) email.value = data.user?.email || '';
-
-        // Profile data
+        // Fill profile fields
         if (data.profile) {
-            const age = document.getElementById('age');
-            const dob = document.getElementById('dob');
-            const contact = document.getElementById('contact');
-            const address = document.getElementById('address');
-
-            if (age) age.value = data.profile.age || '';
-            if (dob) dob.value = data.profile.dob || '';
-            if (contact) contact.value = data.profile.contact || '';
-            if (address) address.value = data.profile.address || '';
+            document.querySelector('[name="age"]').value = data.profile.age || '';
+            document.querySelector('[name="dob"]').value = data.profile.dob || '';
+            document.querySelector('[name="contact"]').value = data.profile.contact || '';
+            document.querySelector('[name="address"]').value = data.profile.address || '';
         }
     })
     .catch(error => {
@@ -72,7 +57,12 @@ function loadProfile() {
 
 function updateProfile() {
     const token = localStorage.getItem('token');
-    const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+
+    if (!token) {
+        alert('Please login first.');
+        return;
+    }
 
     fetch('php/profile.php', {
         method: 'POST',
@@ -81,19 +71,23 @@ function updateProfile() {
         },
         body: JSON.stringify({
             token: token,
+            user: user,
             action: 'update',
-            username: storedUser.username,
-            email: storedUser.email,
-            age: document.getElementById('age').value,
-            dob: document.getElementById('dob').value,
-            contact: document.getElementById('contact').value,
-            address: document.getElementById('address').value
+            age: document.querySelector('[name="age"]').value,
+            dob: document.querySelector('[name="dob"]').value,
+            contact: document.querySelector('[name="contact"]').value,
+            address: document.querySelector('[name="address"]').value
         })
     })
     .then(response => response.json())
     .then(data => {
         console.log('Update response:', data);
-        alert(data.message || 'Profile updated.');
+
+        if (data.status === 'success') {
+            alert(data.message || 'Profile updated successfully.');
+        } else {
+            alert(data.message || 'Failed to update profile.');
+        }
     })
     .catch(error => {
         console.error('Update profile error:', error);
@@ -103,5 +97,6 @@ function updateProfile() {
 
 function logout() {
     localStorage.removeItem('token');
+    localStorage.removeItem('user');
     window.location.href = 'login.html';
 }
