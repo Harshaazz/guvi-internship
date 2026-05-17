@@ -1,11 +1,13 @@
 // js/login.js
+// Replace your entire file with this code.
 
 $(document).ready(function () {
     $('#loginForm').on('submit', function (e) {
         e.preventDefault();
 
-        const email = $('#email').val().trim();
-        const password = $('#password').val();
+        // Use name attributes instead of IDs to avoid "undefined" errors
+        const email = $('input[name="email"]').val().trim();
+        const password = $('input[name="password"]').val();
 
         if (!email || !password) {
             alert('Please enter email and password.');
@@ -29,10 +31,17 @@ $(document).ready(function () {
                 console.log('Login response:', response);
 
                 if (response.status === 'success') {
-                    // Save session token in localStorage
+                    // Save token in localStorage
                     localStorage.setItem('token', response.token);
                     localStorage.setItem('session_token', response.token);
-                    localStorage.setItem('user', JSON.stringify(response.user));
+
+                    // Save user safely
+                    if (response.user) {
+                        localStorage.setItem(
+                            'user',
+                            JSON.stringify(response.user)
+                        );
+                    }
 
                     // Redirect to profile page
                     window.location.href = 'profile.html';
@@ -41,7 +50,7 @@ $(document).ready(function () {
                 }
             },
 
-            error: function (xhr, status, error) {
+            error: function (xhr) {
                 console.error('AJAX Error:', xhr.responseText);
                 alert('Server error occurred during login.');
             },
