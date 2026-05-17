@@ -1,14 +1,11 @@
 <?php
-// php/profile.php
-// Final version with MongoDB optional and safe JSON handling.
-
+session_start();
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
 header('Content-Type: application/json');
 
 require_once 'db.php';
-
 /*
 |--------------------------------------------------------------------------
 | Read JSON Input Safely
@@ -38,22 +35,15 @@ if (empty($token)) {
     exit;
 }
 
+// Start session (add this near the top of profile.php if not already present)
+session_start();
+
 /*
 |--------------------------------------------------------------------------
-| Validate Session (Redis)
+| Validate Session Using PHP Session
 |--------------------------------------------------------------------------
 */
-if (!$redis) {
-    echo json_encode([
-        'status' => 'error',
-        'message' => 'Session storage unavailable.'
-    ]);
-    exit;
-}
-
-$sessionData = $redis->get("session:$token");
-
-if (!$sessionData) {
+if (!isset($_SESSION['user']) || !is_array($_SESSION['user'])) {
     echo json_encode([
         'status' => 'error',
         'message' => 'Session expired. Please login again.'
@@ -61,7 +51,7 @@ if (!$sessionData) {
     exit;
 }
 
-$user = json_decode($sessionData, true);
+$user = $_SESSION['user'];
 
 if (!is_array($user)) {
     echo json_encode([

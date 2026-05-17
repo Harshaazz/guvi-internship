@@ -1,4 +1,5 @@
 <?php
+session_start();
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
@@ -62,19 +63,18 @@ $token = bin2hex(random_bytes(32));
 
 /*
 |--------------------------------------------------------------------------
-| Store session in Redis
+| Store session using PHP Session
 |--------------------------------------------------------------------------
 */
-if ($redis) {
-    $redis->setex(
-        "session:$token",
-        86400,
-        json_encode([
-            'username' => $user['username'],
-            'email' => $user['email']
-        ])
-    );
-}
+session_start();
+
+$_SESSION['user'] = [
+    'username' => $user['username'],
+    'email'    => $user['email']
+];
+
+// Optional: also store token if your frontend still uses it
+$_SESSION['token'] = $token;
 
 echo json_encode([
     'status' => 'success',
@@ -82,7 +82,8 @@ echo json_encode([
     'token' => $token,
     'user' => [
         'username' => $user['username'],
-        'email' => $user['email']
+        'email'    => $user['email']
     ]
 ]);
+exit;
 ?>
