@@ -34,15 +34,6 @@ if (empty($token)) {
     exit;
 }
 
-// Check Redis connection
-if (!$redis) {
-    echo json_encode([
-        'status' => 'error',
-        'message' => 'Redis connection failed.'
-    ]);
-    exit;
-}
-
 // Validate session
 $sessionData = $redis->get("session:$token");
 
