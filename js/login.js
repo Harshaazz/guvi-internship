@@ -1,19 +1,31 @@
 // js/login.js
 
 $(document).ready(function () {
-    $('#loginBtn').on('click', function (e) {
+    // Handle form submission
+    $('#loginForm').on('submit', function (e) {
         e.preventDefault();
 
+        // Clear old messages
+        $('#loginMessage').html('');
+
+        // Get form values
         const email = $('#email').val().trim();
         const password = $('#password').val();
 
-        if (!email || !password) {
-            alert('Please enter email and password.');
+        // Validate inputs
+        if (email === '' || password === '') {
+            $('#loginMessage').html(
+                '<div class="alert alert-danger">Email and password are required.</div>'
+            );
             return;
         }
 
-        $('#loginBtn').prop('disabled', true).text('Logging in...');
+        // Disable button while processing
+        $('#loginBtn')
+            .prop('disabled', true)
+            .text('Logging in...');
 
+        // Send AJAX request
         $.ajax({
             url: 'php/login.php',
             type: 'POST',
@@ -24,40 +36,89 @@ $(document).ready(function () {
                 password: password
             }),
 
-            success: function (res) {
-                console.log('Login response:', res);
+            success: function (response) {
+                console.log('Login Response:', response);
 
-                if (res.status === 'success') {
-                    // Save token
-                    localStorage.setItem('token', res.token);
+                // Successful login
+                if (response.status === 'success' && response.token) {
+                    // Store token using BOTH keys for compatibility
+                    localStorage.setItem('token', response.token);
+                    localStorage.setItem('session_token', response.token);
 
-                    // Save user data
-                    if (res.user) {
+                    // Store user data
+                    if (response.user) {
                         localStorage.setItem(
                             'user',
-                            JSON.stringify(res.user)
+                            JSON.stringify(response.user)
+                        );
+
+                        localStorage.setItem(
+                            'username',
+                            response.user.username || ''
+                        );
+
+                        localStorage.setItem(
+                            'email',
+                            response.user.email || ''
+                        );
+                    } else {
+                        // Fallback if API returns username/email directly
+                        localStorage.setItem(
+                            'username',
+                            response.username || ''
+                        );
+
+                        localStorage.setItem(
+                            'email',
+                            response.email || ''
                         );
                     }
 
-                    // Remove old key
-                    localStorage.removeItem('session_token');
+                    // Show success message
+                    $('#loginMessage').html(
+                        '<div class="alert alert-success">Login successful. Redirecting...</div>'
+                    );
 
-                    // Redirect to profile page
+                    // Redirect after short delay
                     setTimeout(function () {
                         window.location.href = 'profile.html';
-                    }, 100);
+                    }, 500);
                 } else {
-                    alert(res.message || 'Login failed.');
+                    // Show backend error
+                    $('#loginMessage').html(
+                        '<div class="alert alert-danger">' +
+                        (response.message || 'Login failed.') +
+                        '</div>'
+                    );
                 }
             },
 
             error: function (xhr) {
-                console.log(xhr.responseText);
-                alert('Login failed. Check console for details.');
+                console.error('Login Error:', xhr.responseText);
+
+                let message = 'Server error occurred.';
+
+                try {
+                    const errorResponse = JSON.parse(xhr.responseText);
+                    if (errorResponse.message) {
+                        message = errorResponse.message;
+                    }
+                } catch (e) {
+                    // Ignore parse errors
+                }
+
+                $('#loginMessage').html(
+                    '<div class="alert alert-danger">' +
+                    message +
+                    '</div>'
+                );
             },
 
             complete: function () {
-                $('#loginBtn').prop('disabled', false).text('Login');
+                // Re-enable button
+                $('#loginBtn')
+                    .prop('disabled', false)
+                    .text('Login');
             }
         });
     });
