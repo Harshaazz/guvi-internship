@@ -1,7 +1,6 @@
 <?php
 // php/profile.php
-// Replace your entire file with this version.
-// This version allows profile view/update even if MongoDB is unavailable.
+// Final version with MongoDB optional and safe JSON handling.
 
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
@@ -10,21 +9,26 @@ header('Content-Type: application/json');
 
 require_once 'db.php';
 
-// Read JSON input
+/*
+|--------------------------------------------------------------------------
+| Read JSON Input Safely
+|--------------------------------------------------------------------------
+*/
 $raw = file_get_contents('php://input');
 $data = json_decode($raw, true);
 
+// If no JSON was sent (e.g., browser opens the URL directly), use empty array
 if (!is_array($data)) {
-    echo json_encode([
-        'status' => 'error',
-        'message' => 'Invalid JSON input.'
-    ]);
-    exit;
+    $data = [];
 }
 
-// Get token
-$token = $data['token'] ?? '';
-$action = $data['action'] ?? 'get';
+/*
+|--------------------------------------------------------------------------
+| Get Token and Action
+|--------------------------------------------------------------------------
+*/
+$token  = $data['token'] ?? ($_GET['token'] ?? '');
+$action = $data['action'] ?? ($_GET['action'] ?? 'get');
 
 if (empty($token)) {
     echo json_encode([
@@ -34,7 +38,19 @@ if (empty($token)) {
     exit;
 }
 
-// Validate session
+/*
+|--------------------------------------------------------------------------
+| Validate Session (Redis)
+|--------------------------------------------------------------------------
+*/
+if (!$redis) {
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'Session storage unavailable.'
+    ]);
+    exit;
+}
+
 $sessionData = $redis->get("session:$token");
 
 if (!$sessionData) {
@@ -62,11 +78,11 @@ if (!is_array($user)) {
 */
 if ($action === 'get') {
 
-    // If MongoDB is not available, still return user data
+    // If MongoDB is unavailable, still return user data
     if (!$mongoCollection) {
         echo json_encode([
-            'status' => 'success',
-            'user' => $user,
+            'status'  => 'success',
+            'user'    => $user,
             'profile' => null
         ]);
         exit;
@@ -80,18 +96,20 @@ if ($action === 'get') {
         if ($profile) {
             $profile = (array)$profile;
             unset($profile['_id']);
+        } else {
+            $profile = null;
         }
 
         echo json_encode([
-            'status' => 'success',
-            'user' => $user,
+            'status'  => 'success',
+            'user'    => $user,
             'profile' => $profile
         ]);
     } catch (Throwable $e) {
-        // Ignore MongoDB failure and still load page
+        // Ignore MongoDB errors and still load page
         echo json_encode([
-            'status' => 'success',
-            'user' => $user,
+            'status'  => 'success',
+            'user'    => $user,
             'profile' => null
         ]);
     }
@@ -109,7 +127,7 @@ if ($action === 'update') {
     // If MongoDB is unavailable, return success so UI still works
     if (!$mongoCollection) {
         echo json_encode([
-            'status' => 'success',
+            'status'  => 'success',
             'message' => 'Profile data cannot be stored because MongoDB is unavailable.'
         ]);
         exit;
@@ -125,29 +143,38 @@ if ($action === 'update') {
             'updated_at' => new MongoDB\BSON\UTCDateTime()
         ];
 
-        $mongoCollection->updateOne(
+        $result = $mongoCollection->updateOne(
             ['user_id' => $user['email']],
             ['$set' => $updateData],
             ['upsert' => true]
         );
 
         echo json_encode([
-            'status' => 'success',
-            'message' => 'Profile updated successfully.'
+            'status'      => 'success',
+            'message'     => 'Profile updated successfully.',
+            'matched'     => $result->getMatchedCount(),
+            'modified'    => $result->getModifiedCount(),
+            'upserted_id' => $result->getUpsertedId()
+                ? (string)$result->getUpsertedId()
+                : null
         ]);
     } catch (Throwable $e) {
         echo json_encode([
-            'status' => 'error',
-            'message' => 'MongoDB connection failed.'
+            'status'  => 'error',
+            'message' => $e->getMessage()
         ]);
     }
 
     exit;
 }
 
-// Invalid action
+/*
+|--------------------------------------------------------------------------
+| Invalid Action
+|--------------------------------------------------------------------------
+*/
 echo json_encode([
-    'status' => 'error',
+    'status'  => 'error',
     'message' => 'Invalid action.'
 ]);
 exit;
