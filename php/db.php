@@ -1,76 +1,131 @@
 <?php
-require_once __DIR__ . '/../vendor/autoload.php';
+// php/login.php
 
-use Predis\Client as PredisClient;
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
 
-/*
-|--------------------------------------------------------------------------
-| MySQL Connection
-|--------------------------------------------------------------------------
-*/
-$host = getenv('MYSQLHOST');
-$port = getenv('MYSQLPORT') ?: 3306;
-$database = getenv('MYSQLDATABASE') ?: getenv('MYSQL_DATABASE');
-$username = getenv('MYSQLUSER');
-$password = getenv('MYSQLPASSWORD');
+header('Content-Type: application/json');
 
-$conn = null;
+require_once 'db.php';
 
-if ($host && $database && $username) {
-    $conn = new mysqli($host, $username, $password, $database, (int)$port);
-
-    if ($conn->connect_error) {
-        $conn = null;
-    }
+// Ensure MySQL is connected
+if (!$conn) {
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'Database connection failed.'
+    ]);
+    exit;
 }
 
-/*
-|--------------------------------------------------------------------------
-| MongoDB Connection
-|--------------------------------------------------------------------------
-*/
-$mongoCollection = null;
+// Ensure Redis is connected
+if (!$redis) {
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'Redis connection failed.'
+    ]);
+    exit;
+}
 
+// Read JSON input
+$raw = file_get_contents('php://input');
+$data = json_decode($raw, true);
+
+// Validate JSON
+if (!is_array($data)) {
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'Invalid JSON input.'
+    ]);
+    exit;
+}
+
+// Get values
+$email = trim($data['email'] ?? '');
+$password = $data['password'] ?? '';
+
+// Validate input
+if (empty($email) || empty($password)) {
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'Email and password are required.'
+    ]);
+    exit;
+}
+
+// Prepared statement (required by project criteria)
+$stmt = $conn->prepare("
+    SELECT id, username, email, password
+    FROM users
+    WHERE email = ?
+    LIMIT 1
+");
+
+if (!$stmt) {
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'Query preparation failed.',
+        'error' => $conn->error
+    ]);
+    exit;
+}
+
+$stmt->bind_param("s", $email);
+$stmt->execute();
+
+$result = $stmt->get_result();
+
+if ($result->num_rows !== 1) {
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'Invalid email or password.'
+    ]);
+    $stmt->close();
+    exit;
+}
+
+$user = $result->fetch_assoc();
+
+// Verify hashed password
+if (!password_verify($password, $user['password'])) {
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'Invalid email or password.'
+    ]);
+    $stmt->close();
+    exit;
+}
+
+// Remove password before storing session
+unset($user['password']);
+
+// Generate secure session token
+$token = bin2hex(random_bytes(32));
+
+// Store session in Redis for 24 hours
 try {
-    $mongoHost = getenv('MONGOHOST') ?: 'mongodb';
-    $mongoPort = getenv('MONGOPORT') ?: 27017;
-    $mongoDatabase = getenv('MONGODB_DATABASE') ?: 'guvi';
-    $mongoUri = "mongodb://{$mongoHost}:{$mongoPort}";
-
-    $mongoClient = new MongoDB\Client($mongoUri);
-    $mongoDb = $mongoClient->$mongoDatabase;
-    $mongoCollection = $mongoDb->profiles;
+    $redis->setex(
+        "session:$token",
+        86400, // 24 hours
+        json_encode($user)
+    );
 } catch (Exception $e) {
-    $mongoCollection = null;
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'Failed to store session.',
+        'error' => $e->getMessage()
+    ]);
+    $stmt->close();
+    exit;
 }
 
-/*
-|--------------------------------------------------------------------------
-| Redis Connection
-|--------------------------------------------------------------------------
-*/
-$redis = null;
+$stmt->close();
 
-try {
-    $redisHost = getenv('REDISHOST') ?: 'redis';
-    $redisPort = getenv('REDISPORT') ?: 6379;
-    $redisPassword = getenv('REDISPASSWORD') ?: null;
-
-    $params = [
-        'scheme' => 'tcp',
-        'host'   => $redisHost,
-        'port'   => (int)$redisPort,
-    ];
-
-    if (!empty($redisPassword)) {
-        $params['password'] = $redisPassword;
-    }
-
-    $redis = new PredisClient($params);
-
-    // Test connection
-    $redis->ping();
-} catch (Exception $e) {
-    $redis = null;
-}
+// Success response
+echo json_encode([
+    'status' => 'success',
+    'message' => 'Login successful.',
+    'token' => $token,
+    'user' => $user
+]);
+exit;
 ?>
